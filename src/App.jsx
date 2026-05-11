@@ -268,26 +268,41 @@ export default function App() {
   const handleLogin = async (nome) => {
     setMotorista(nome);
     setLoadingHist(true);
+    const SUPABASE_URL = "https://vqdkkqpxvszbdviljskn.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_i_TgJQvHEa1rclvUft88lw_8GZcX7My";
     try {
-      const res = await fetch(`/api/chat?motorista=${encodeURIComponent(nome)}`);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/historico_conversa?motorista_nome=eq.${encodeURIComponent(nome)}&order=created_at.asc&limit=100`,
+        { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } }
+      );
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        const hist = data.map(m => ({ role: m.role, content: m.content }));
-        setMsgs(hist);
+        setMsgs(data.map(m => ({ role: m.role, content: m.content })));
       } else {
-        // Primeira vez — mensagem de boas-vindas
-        setMsgs([{
-          role: "assistant",
-          content: `Olá, **${nome}**! Sou o **BEN**, assistente oficial da Bendini Logística.\n\nEstou aqui para responder suas dúvidas sobre regras, procedimentos e tudo que você precisa saber para trabalhar na Bendini.\n\nComo posso ajudar?`
-        }]);
+        setMsgs([{ role: "assistant", content: `Olá, **${nome}**! Sou o **BEN**, assistente oficial da Bendini Logística.\n\nEstou aqui para responder suas dúvidas sobre regras, procedimentos e tudo que você precisa saber para trabalhar na Bendini.\n\nComo posso ajudar?` }]);
       }
     } catch {
-      setMsgs([{
-        role: "assistant",
-        content: `Olá, **${nome}**! Sou o **BEN**, assistente oficial da Bendini Logística.\n\nComo posso ajudar?`
-      }]);
+      setMsgs([{ role: "assistant", content: `Olá, **${nome}**! Sou o **BEN**, assistente oficial da Bendini Logística.\n\nComo posso ajudar?` }]);
     }
     setLoadingHist(false);
+  };
+
+  const SUPABASE_URL = "https://vqdkkqpxvszbdviljskn.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_i_TgJQvHEa1rclvUft88lw_8GZcX7My";
+
+  const saveMsg = async (role, content) => {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/historico_conversa`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ motorista_nome: motorista, role, content }),
+      });
+    } catch {}
   };
 
   const send = async () => {
@@ -297,21 +312,27 @@ export default function App() {
     const newMsgs = [...msgs, { role: "user", content: txt }];
     setMsgs(newMsgs);
     setLoading(true);
+    await saveMsg("user", txt);
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
           system: BENDINI_KNOWLEDGE,
           messages: newMsgs,
-          motorista: motorista,
         }),
       });
       const d = await res.json();
       const reply = d.content?.[0]?.text || "Não foi possível processar. Tente novamente.";
       setMsgs(p => [...p, { role: "assistant", content: reply }]);
+      await saveMsg("assistant", reply);
     } catch {
       setMsgs(p => [...p, { role: "assistant", content: "Erro de conexão. Tente novamente." }]);
     }
