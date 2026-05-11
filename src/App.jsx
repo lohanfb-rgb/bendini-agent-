@@ -318,7 +318,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": "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",
+          "x-api-key": "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",
           "anthropic-version": "2023-06-01",
           "anthropic-dangerous-direct-browser-access": "true",
         },
