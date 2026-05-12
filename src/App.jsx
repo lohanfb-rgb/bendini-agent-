@@ -1,32 +1,32 @@
 import { useState, useRef, useEffect } from "react";
 
 // ── Configuração ───────────────────────────────────────────
-const SB_URL = import.meta.env.VITE_SUPABASE_URL || "https://vqdkkqpxvszbdviljskn.supabase.co";
-const SB_KEY = import.meta.env.VITE_SUPABASE_KEY;
 const ADM_SENHA = "Bendini@2026";
-
-const sbH = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
 const sb = {
   get: async (table, query = "") => {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, { headers: sbH });
+    const r = await fetch(`/api/chat?action=sb_get&table=${table}&query=${encodeURIComponent(query)}`);
     return r.json();
   },
   post: async (table, body) => {
-    await fetch(`${SB_URL}/rest/v1/${table}`, {
-      method: "POST", headers: { ...sbH, "Prefer": "return=minimal" },
-      body: JSON.stringify(body),
+    await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sb_post", table, body }),
     });
   },
   patch: async (table, query, body) => {
-    await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-      method: "PATCH", headers: { ...sbH, "Prefer": "return=minimal" },
-      body: JSON.stringify(body),
+    await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sb_patch", table, query, body }),
     });
   },
   delete: async (table, query) => {
-    await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-      method: "DELETE", headers: sbH,
+    await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sb_delete", table, query }),
     });
   },
 };
@@ -433,7 +433,9 @@ export default function App() {
   };
 
   const saveMsg = async (role, content) => {
-    try { await sb.post("historico_conversa", { motorista_nome: usuario.cpf, role, content }); } catch {}
+    try {
+      await sb.post("historico_conversa", { motorista_nome: usuario.cpf, role, content });
+    } catch {}
   };
 
   const send = async () => {
@@ -443,12 +445,11 @@ export default function App() {
     const newMsgs = [...msgs, { role:"user", content:txt }];
     setMsgs(newMsgs);
     setLoading(true);
-    await saveMsg("user", txt);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/chat", {
         method:"POST",
-        headers: { "Content-Type":"application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
-        body: JSON.stringify({ model:"claude-haiku-4-5-20251001", max_tokens:1000, system:buildKnowledge(), messages:newMsgs }),
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ action:"ai_chat", model:"claude-haiku-4-5-20251001", max_tokens:1000, system:buildKnowledge(), messages:newMsgs, motorista:usuario.cpf }),
       });
       const d = await res.json();
       const reply = d.content?.[0]?.text || "Não foi possível processar. Tente novamente.";
