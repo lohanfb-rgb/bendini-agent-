@@ -2,35 +2,33 @@ import { useState, useRef, useEffect } from "react";
 
 // ── Configuração ───────────────────────────────────────────
 const SB_URL = "https://vqdkkqpxvszbdviljskn.supabase.co";
-const SB_KEY = "sb_publishable_i_TgJQvHEa1rclvUft88lw_8GZcX7My";
+const SB_PUB = "sb_publishable_i_TgJQvHEa1rclvUft88lw_8GZcX7My";
+const SB_SEC = "sb_secret_Vr0j3N5V8V2hvCetuks2Pw_qA5s-oPU";
 const ADM_SENHA = "Bendini@2026";
 
-const sbHeaders = {
-  "apikey": SB_KEY,
-  "Authorization": `Bearer ${SB_KEY}`,
-  "Content-Type": "application/json",
-};
+const hRead  = { "apikey": SB_PUB, "Authorization": `Bearer ${SB_PUB}`, "Content-Type": "application/json" };
+const hWrite = { "apikey": SB_SEC, "Authorization": `Bearer ${SB_SEC}`, "Content-Type": "application/json" };
 
 const sb = {
   get: async (table, query = "") => {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, { headers: sbHeaders });
+    const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, { headers: hRead });
     return r.json();
   },
   post: async (table, body) => {
     await fetch(`${SB_URL}/rest/v1/${table}`, {
-      method: "POST", headers: { ...sbHeaders, "Prefer": "return=minimal" },
+      method: "POST", headers: { ...hWrite, "Prefer": "return=minimal" },
       body: JSON.stringify(body),
     });
   },
   patch: async (table, query, body) => {
     await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-      method: "PATCH", headers: { ...sbHeaders, "Prefer": "return=minimal" },
+      method: "PATCH", headers: { ...hWrite, "Prefer": "return=minimal" },
       body: JSON.stringify(body),
     });
   },
   delete: async (table, query) => {
     await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-      method: "DELETE", headers: sbHeaders,
+      method: "DELETE", headers: hWrite,
     });
   },
 };
