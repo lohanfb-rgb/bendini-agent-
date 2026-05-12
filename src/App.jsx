@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 
 // ── Configuração ───────────────────────────────────────────
-const SB_URL = import.meta.env.SUPABASE_URL || "https://vqdkkqpxvszbdviljskn.supabase.co";
-const SB_KEY = import.meta.env.SUPABASE_KEY;
+const SB_URL = import.meta.env.VITE_SUPABASE_URL || "https://vqdkkqpxvszbdviljskn.supabase.co";
+const SB_KEY = import.meta.env.VITE_SUPABASE_KEY;
 const ADM_SENHA = "Bendini@2026";
 
 const sbH = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
