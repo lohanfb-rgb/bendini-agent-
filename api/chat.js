@@ -2,59 +2,118 @@ module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_KEY = process.env.SUPABASE_KEY;
+  const SB_URL = process.env.VITE_SUPABASE_URL;
+  const SB_KEY = process.env.VITE_SUPABASE_KEY;
+  const AI_KEY = process.env.VITE_ANTHROPIC_API_KEY;
 
+  const sbH = {
+    "apikey": SB_KEY,
+    "Authorization": `Bearer ${SB_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  // ── GET /api/chat?action=... ──────────────────────────────
   if (req.method === "GET") {
-    const { motorista } = req.query;
-    if (!motorista) return res.status(400).json({ error: "Nome obrigatório" });
-    try {
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/historico_conversa?motorista_nome=eq.${encodeURIComponent(motorista)}&order=created_at.asc&limit=100`,
-        { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } }
-      );
-      const data = await response.json();
-      return res.status(200).json(data);
-    } catch {
-      return res.status(500).json({ error: "Erro ao buscar histórico" });
+    const { action, table, query } = req.query;
+
+    if (action === "sb_get") {
+      try {
+        const r = await fetch(`${SB_URL}/rest/v1/${table}?${query || ""}`, { headers: sbH });
+        const d = await r.json();
+        return res.status(r.status).json(d);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
     }
+    return res.status(400).json({ error: "Unknown action" });
   }
 
+  // ── POST /api/chat ────────────────────────────────────────
   if (req.method === "POST") {
-    const { messages, motorista, model, max_tokens, system } = req.body;
-    if (!motorista) return res.status(400).json({ error: "Nome obrigatório" });
-    try {
-      const lastMsg = messages[messages.length - 1];
-      await fetch(`${SUPABASE_URL}/rest/v1/historico_conversa`, {
-        method: "POST",
-        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
-        body: JSON.stringify({ motorista_nome: motorista, role: lastMsg.role, content: lastMsg.content }),
-      });
+    const { action } = req.body;
 
-      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model, max_tokens, system, messages }),
-      });
-
-      const data = await anthropicRes.json();
-      const reply = data.content?.[0]?.text || "";
-
-      if (reply) {
-        await fetch(`${SUPABASE_URL}/rest/v1/historico_conversa`, {
+    // Supabase INSERT
+    if (action === "sb_post") {
+      const { table, body } = req.body;
+      try {
+        const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
           method: "POST",
-          headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
-          body: JSON.stringify({ motorista_nome: motorista, role: "assistant", content: reply }),
+          headers: { ...sbH, "Prefer": "return=minimal" },
+          body: JSON.stringify(body),
         });
+        return res.status(r.status).json({ ok: r.ok });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
       }
-
-      return res.status(anthropicRes.status).json(data);
-    } catch(e) {
-      return res.status(500).json({ error: "Erro ao processar", detail: e.message });
     }
+
+    // Supabase PATCH
+    if (action === "sb_patch") {
+      const { table, query, body } = req.body;
+      try {
+        const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+          method: "PATCH",
+          headers: { ...sbH, "Prefer": "return=minimal" },
+          body: JSON.stringify(body),
+        });
+        return res.status(r.status).json({ ok: r.ok });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Supabase DELETE
+    if (action === "sb_delete") {
+      const { table, query } = req.body;
+      try {
+        const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+          method: "DELETE",
+          headers: sbH,
+        });
+        return res.status(r.status).json({ ok: r.ok });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Anthropic chat
+    if (action === "ai_chat") {
+      const { messages, system, model, max_tokens, motorista } = req.body;
+      try {
+        // Salvar mensagem do usuário
+        const lastMsg = messages[messages.length - 1];
+        await fetch(`${SB_URL}/rest/v1/historico_conversa`, {
+          method: "POST",
+          headers: { ...sbH, "Prefer": "return=minimal" },
+          body: JSON.stringify({ motorista_nome: motorista, role: lastMsg.role, content: lastMsg.content }),
+        });
+
+        // Chamar Anthropic
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": AI_KEY, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model, max_tokens, system, messages }),
+        });
+        const d = await r.json();
+        const reply = d.content?.[0]?.text || "";
+
+        // Salvar resposta
+        if (reply) {
+          await fetch(`${SB_URL}/rest/v1/historico_conversa`, {
+            method: "POST",
+            headers: { ...sbH, "Prefer": "return=minimal" },
+            body: JSON.stringify({ motorista_nome: motorista, role: "assistant", content: reply }),
+          });
+        }
+        return res.status(r.status).json(d);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    return res.status(400).json({ error: "Unknown action" });
   }
 
   return res.status(405).json({ error: "Method not allowed" });
