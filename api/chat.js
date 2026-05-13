@@ -4,113 +4,151 @@ module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const SB_URL = process.env.VITE_SUPABASE_URL;
-  const SB_KEY = process.env.VITE_SUPABASE_KEY;
-  const AI_KEY = process.env.VITE_ANTHROPIC_API_KEY;
+  const SB  = process.env.VITE_SUPABASE_URL;
+  const KEY = process.env.VITE_SUPABASE_KEY;
+  const AI  = process.env.VITE_ANTHROPIC_API_KEY;
 
-  const sbH = {
-    "apikey": SB_KEY,
-    "Authorization": `Bearer ${SB_KEY}`,
-    "Content-Type": "application/json",
+  const H = { "apikey": KEY, "Authorization": `Bearer ${KEY}`, "Content-Type": "application/json" };
+
+  const sbGet = async (table, query = "") => {
+    const r = await fetch(`${SB}/rest/v1/${table}?${query}`, { headers: H });
+    return r.json();
+  };
+  const sbPost = async (table, body) => {
+    const r = await fetch(`${SB}/rest/v1/${table}`, {
+      method: "POST", headers: { ...H, "Prefer": "return=representation" },
+      body: JSON.stringify(body),
+    });
+    return r.json();
+  };
+  const sbPatch = async (table, query, body) => {
+    await fetch(`${SB}/rest/v1/${table}?${query}`, {
+      method: "PATCH", headers: { ...H, "Prefer": "return=minimal" },
+      body: JSON.stringify(body),
+    });
+  };
+  const sbDelete = async (table, query) => {
+    await fetch(`${SB}/rest/v1/${table}?${query}`, { method: "DELETE", headers: H });
   };
 
-  // ── GET /api/chat?action=... ──────────────────────────────
+  // ── GET ──────────────────────────────────────────────────
   if (req.method === "GET") {
     const { action, table, query } = req.query;
-
     if (action === "sb_get") {
       try {
-        const r = await fetch(`${SB_URL}/rest/v1/${table}?${query || ""}`, { headers: sbH });
-        const d = await r.json();
-        return res.status(r.status).json(d);
-      } catch (e) {
-        return res.status(500).json({ error: e.message });
-      }
+        const d = await sbGet(table, query || "");
+        return res.status(200).json(d);
+      } catch (e) { return res.status(500).json({ error: e.message }); }
     }
     return res.status(400).json({ error: "Unknown action" });
   }
 
-  // ── POST /api/chat ────────────────────────────────────────
+  // ── POST ─────────────────────────────────────────────────
   if (req.method === "POST") {
     const { action } = req.body;
 
-    // Supabase INSERT
     if (action === "sb_post") {
-      const { table, body } = req.body;
       try {
-        const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
-          method: "POST",
-          headers: { ...sbH, "Prefer": "return=minimal" },
-          body: JSON.stringify(body),
-        });
-        return res.status(r.status).json({ ok: r.ok });
-      } catch (e) {
-        return res.status(500).json({ error: e.message });
-      }
+        const d = await sbPost(req.body.table, req.body.body);
+        return res.status(200).json(d);
+      } catch (e) { return res.status(500).json({ error: e.message }); }
     }
 
-    // Supabase PATCH
     if (action === "sb_patch") {
-      const { table, query, body } = req.body;
       try {
-        const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-          method: "PATCH",
-          headers: { ...sbH, "Prefer": "return=minimal" },
-          body: JSON.stringify(body),
-        });
-        return res.status(r.status).json({ ok: r.ok });
-      } catch (e) {
-        return res.status(500).json({ error: e.message });
-      }
+        await sbPatch(req.body.table, req.body.query, req.body.body);
+        return res.status(200).json({ ok: true });
+      } catch (e) { return res.status(500).json({ error: e.message }); }
     }
 
-    // Supabase DELETE
     if (action === "sb_delete") {
-      const { table, query } = req.body;
       try {
-        const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-          method: "DELETE",
-          headers: sbH,
+        await sbDelete(req.body.table, req.body.query);
+        return res.status(200).json({ ok: true });
+      } catch (e) { return res.status(500).json({ error: e.message }); }
+    }
+
+    // ── Gerar Quiz com IA ────────────────────────────────
+    if (action === "gerar_quiz") {
+      const { regra_id, titulo, conteudo } = req.body;
+      try {
+        const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": AI, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 2000,
+            system: `Você é um especialista em criar questões de avaliação para motoristas de transportadora.
+Crie exatamente 10 perguntas de múltipla escolha sobre a regra fornecida.
+Retorne APENAS um JSON válido, sem texto antes ou depois, no formato:
+{
+  "perguntas": [
+    {
+      "pergunta": "texto da pergunta",
+      "opcao_a": "opção A",
+      "opcao_b": "opção B", 
+      "opcao_c": "opção C",
+      "opcao_d": "opção D",
+      "correta": "a" ou "b" ou "c" ou "d",
+      "explicacao": "explicação curta da resposta correta"
+    }
+  ]
+}
+As perguntas devem ser práticas e diretas. Varie as posições da resposta correta.`,
+            messages: [{ role: "user", content: `Crie 10 perguntas sobre esta regra da Bendini Logística:\n\nTÍTULO: ${titulo}\n\nCONTEÚDO: ${conteudo}` }]
+          })
         });
-        return res.status(r.status).json({ ok: r.ok });
+
+        const aiData = await aiRes.json();
+        const txt = aiData.content?.[0]?.text || "";
+        const json = JSON.parse(txt.replace(/```json|```/g, "").trim());
+
+        // Criar o quiz
+        const quizArr = await sbPost("quizzes", { regra_id, titulo: `Quiz: ${titulo}`, status: "ativo" });
+        const quiz = Array.isArray(quizArr) ? quizArr[0] : quizArr;
+
+        // Criar as questões
+        for (let i = 0; i < json.perguntas.length; i++) {
+          const p = json.perguntas[i];
+          await sbPost("quiz_questoes", {
+            quiz_id: quiz.id,
+            pergunta: p.pergunta,
+            opcao_a: p.opcao_a,
+            opcao_b: p.opcao_b,
+            opcao_c: p.opcao_c,
+            opcao_d: p.opcao_d,
+            correta: p.correta,
+            explicacao: p.explicacao,
+            ordem: i + 1,
+          });
+        }
+
+        return res.status(200).json({ ok: true, quiz_id: quiz.id, total: json.perguntas.length });
       } catch (e) {
         return res.status(500).json({ error: e.message });
       }
     }
 
-    // Anthropic chat
+    // ── Chat IA ──────────────────────────────────────────
     if (action === "ai_chat") {
       const { messages, system, model, max_tokens, motorista } = req.body;
       try {
-        // Salvar mensagem do usuário
         const lastMsg = messages[messages.length - 1];
-        await fetch(`${SB_URL}/rest/v1/historico_conversa`, {
-          method: "POST",
-          headers: { ...sbH, "Prefer": "return=minimal" },
-          body: JSON.stringify({ motorista_nome: motorista, role: lastMsg.role, content: lastMsg.content }),
-        });
+        await sbPost("historico_conversa", { motorista_nome: motorista, role: lastMsg.role, content: lastMsg.content });
 
-        // Chamar Anthropic
         const r = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": AI_KEY, "anthropic-version": "2023-06-01" },
+          headers: { "Content-Type": "application/json", "x-api-key": AI, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({ model, max_tokens, system, messages }),
         });
         const d = await r.json();
         const reply = d.content?.[0]?.text || "";
 
-        // Salvar resposta
         if (reply) {
-          await fetch(`${SB_URL}/rest/v1/historico_conversa`, {
-            method: "POST",
-            headers: { ...sbH, "Prefer": "return=minimal" },
-            body: JSON.stringify({ motorista_nome: motorista, role: "assistant", content: reply }),
-          });
+          await sbPost("historico_conversa", { motorista_nome: motorista, role: "assistant", content: reply });
         }
         return res.status(r.status).json(d);
-      } catch (e) {
-        return res.status(500).json({ error: e.message });
-      }
+      } catch (e) { return res.status(500).json({ error: e.message }); }
     }
 
     return res.status(400).json({ error: "Unknown action" });
