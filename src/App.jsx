@@ -1,83 +1,35 @@
 import { useState, useRef, useEffect } from "react";
 
-// ── Configuração ───────────────────────────────────────────
 const ADM_SENHA = "Bendini@2026";
 
-const sb = {
-  get: async (table, query = "") => {
-    const r = await fetch(`/api/chat?action=sb_get&table=${table}&query=${encodeURIComponent(query)}`);
+const api = async (action, params = {}) => {
+  if (action === "sb_get") {
+    const r = await fetch(`/api/chat?action=sb_get&table=${params.table}&query=${encodeURIComponent(params.query || "")}`);
     return r.json();
-  },
-  post: async (table, body) => {
-    await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "sb_post", table, body }),
-    });
-  },
-  patch: async (table, query, body) => {
-    await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "sb_patch", table, query, body }),
-    });
-  },
-  delete: async (table, query) => {
-    await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "sb_delete", table, query }),
-    });
-  },
+  }
+  const r = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...params }),
+  });
+  return r.json();
 };
 
-// ── Perguntas do Quiz (completo) ───────────────────────────
-const QUIZ_BASE = [
-  { q: "Qual é a velocidade máxima permitida pelo sistema de telemetria?", opts: ["80 km/h", "85 km/h", "90 km/h", "100 km/h"], c: 1, exp: "Máximo de 85 km/h, tolerância de até 8 picos por semana." },
-  { q: "Com que frequência deve ser feito o reaperto das cintas de amarração?", opts: ["A cada 100 km", "A cada 150 km", "A cada 200 km", "A cada 300 km"], c: 2, exp: "Reaperto a cada 200 km. Nos primeiros 80 km, parada obrigatória." },
-  { q: "Nota abaixo de 8,0 no ranking por 3 meses consecutivos resulta em:", opts: ["Desconto no salário", "Treinamento obrigatório", "Possível rescisão do contrato", "Advertência verbal"], c: 2, exp: "Nota inferior a 8,0 por 3 meses consecutivos pode resultar em rescisão contratual." },
-  { q: "Ao ver luz VERMELHA no painel do Volvo, você deve:", opts: ["Continuar e avisar na base", "Parar, acionar VAS e comunicar a oficina", "Reduzir velocidade e continuar", "Ligar para o programador"], c: 1, exp: "Vermelho = parar imediatamente + acionar VAS + comunicar oficina." },
-  { q: "Qual é o horário máximo de parada das atividades noturnas?", opts: ["22h, retorno às 5h", "23h, retorno às 4h", "00h, retorno às 5h", "21h, retorno às 6h"], c: 1, exp: "Parar até 23h. Retorno somente a partir das 04h." },
-  { q: "Qual é o percentual total máximo de prêmios variáveis?", opts: ["5%", "7%", "9%", "12%"], c: 2, exp: "9% total: 3% produtividade + 1% comprometimento + 1% não avarias + 4% extra economia." },
-  { q: "Velocidade máxima com produto químico em dia de chuva:", opts: ["80 km/h", "75 km/h", "70 km/h", "60 km/h"], c: 2, exp: "Chuva com produto químico: máximo 70 km/h. Curvas: abaixo de 60 km/h." },
-  { q: "Onde ficam as chaves ao deixar o caminhão no pátio Bendini?", opts: ["No bolso", "Na ignição", "No painel de chaves da Oficina", "Com o programador"], c: 2, exp: "Sempre no Painel de Chaves da Oficina, conforme número de cada frota." },
-  { q: "Qual é o valor do Cartão Caju por dia trabalhado?", opts: ["R$ 75,00", "R$ 85,00", "R$ 95,00", "R$ 105,00"], c: 2, exp: "O Cartão Caju vale R$ 95,00 por dia trabalhado." },
-  { q: "Qual é a tolerância de picos de velocidade acima do limite por semana?", opts: ["Até 3 picos", "Até 5 picos", "Até 8 picos", "Até 10 picos"], c: 2, exp: "A telemetria permite até 8 picos por semana acima de 85 km/h." },
-  { q: "O que deve ser feito antes de partir em viagem após o carregamento?", opts: ["Ligar para o cliente", "Enviar macro de início e aguardar 'LIBERADO'", "Verificar o combustível", "Avisar a família"], c: 1, exp: "Obrigatório enviar macro de início de viagem e aguardar a mensagem 'LIBERADO'." },
-  { q: "Qual é a velocidade máxima em pedágios?", opts: ["20 km/h", "30 km/h", "40 km/h", "50 km/h"], c: 2, exp: "Velocidade máxima em pedágios é de 40 km/h." },
-  { q: "Qual é o percentual de periculosidade sobre o salário base?", opts: ["20%", "25%", "30%", "35%"], c: 2, exp: "O adicional de periculosidade é de 30% sobre o salário base." },
-  { q: "O que acontece com falta injustificada na reunião mensal?", opts: ["Advertência verbal", "Desconto no salário", "Desclassificação da premiação mensal", "Nenhuma consequência"], c: 2, exp: "Falta injustificada na reunião = desclassificação da premiação mensal." },
-  { q: "Qual é o peso máximo de tração para caminhão toco?", opts: ["8 toneladas", "10 toneladas", "12 toneladas", "15 toneladas"], c: 1, exp: "Peso máximo de tração para toco é 10 toneladas." },
-  { q: "O que é PROIBIDO fazer com a câmera interna do veículo?", opts: ["Deixar ligada", "Obstruir ou cobrir", "Filmar a carga", "Nada, pode tudo"], c: 1, exp: "Obstruir ou cobrir a câmera interna resulta em advertência por escrito e perda da premiação." },
-  { q: "Quando deve ser feita a Macro de Fim de Viagem?", opts: ["Ao chegar na cidade destino", "Somente com canhotos assinados", "Ao descarregar", "A qualquer momento"], c: 1, exp: "A Macro de Fim de Viagem só pode ser enviada com os canhotos devidamente assinados." },
-  { q: "Qual é a velocidade máxima em chuva ou neblina (sem produto químico)?", opts: ["65 km/h", "70 km/h", "75 km/h", "80 km/h"], c: 2, exp: "Em chuva ou neblina a velocidade máxima é 75 km/h." },
-  { q: "Qual certificação a Bendini possui relacionada ao meio ambiente?", opts: ["ISO 9001", "ISO 14001", "SASSMAQ", "OEA"], c: 1, exp: "A ISO 14001 é a certificação de gestão ambiental da Bendini." },
-  { q: "Pernoites durante as viagens devem ser feitos:", opts: ["Em qualquer posto de combustível", "Apenas em locais homologados", "Onde o motorista preferir", "Somente em hotéis"], c: 1, exp: "Pernoites são permitidos apenas em locais previamente homologados pela empresa." },
-  { q: "O que deve ser feito ao retornar de férias no primeiro dia?", opts: ["Pegar as chaves do caminhão", "Realizar exame periódico (ASO)", "Participar de reunião", "Checar o veículo"], c: 1, exp: "No retorno de férias é obrigatório realizar o exame periódico (ASO) no primeiro dia." },
-  { q: "Qual é a distância mínima entre caminhões da frota Bendini em comboio?", opts: ["500 metros", "800 metros", "1000 metros", "1500 metros"], c: 2, exp: "É proibido fazer comboio com menos de 1000 metros de distância entre os caminhões." },
-  { q: "Quanto tempo máximo o veículo pode ficar ligado parado?", opts: ["1 minuto", "2 minutos", "3 minutos", "5 minutos"], c: 2, exp: "É proibido deixar o veículo ligado por mais de 3 minutos parado." },
-  { q: "O que deve ser feito com a carreta quando está no pátio (vazia ou carregada)?", opts: ["Deixar os eixos levantados", "Deixar os eixos baixados", "Não importa a posição", "Depende da carga"], c: 1, exp: "A carreta deve ficar sempre com os eixos baixados quando estiver no pátio." },
-  { q: "Qual é a pontuação mínima desejada no ranking de desempenho?", opts: ["7,5 pontos", "8,0 pontos", "8,5 pontos", "9,0 pontos"], c: 2, exp: "A pontuação mínima desejada é 8,5 pontos. Abaixo de 8,0 por 3 meses = risco de rescisão." },
-];
-
-const ONBOARDING = [
-  { icon: "🚛", tag: "BOAS-VINDAS", title: "Bem-vindo à Bendini", sub: "Você agora é um Gestor de Unidade Móvel", body: "Essa é a denominação especial que damos aos nossos motoristas, reconhecendo sua importância estratégica para as operações.\n\n\"Desejamos as boas-vindas, muitas realizações e sucesso.\"\n— Everton Pereira Bendini\n\nNos próximos passos, você vai aprender tudo que precisa saber para começar com segurança e excelência na Bendini." },
-  { icon: "📋", tag: "INTEGRAÇÃO", title: "Primeiros 2 Dias", sub: "Apresentação em todos os setores", body: "Você será conduzido pelo seu gestor direto em uma integração completa.\n\nNo primeiro dia você recebe:\n— Kit de EPIs completo\n— Crachá e uniforme\n— Chip corporativo VIVO\n— Inclusão nos grupos de WhatsApp\n\nUso obrigatório: calça jeans ou brim + sapato de segurança + crachá." },
-  { icon: "📡", tag: "COMUNICAÇÃO", title: "Grupos e Comunicação", sub: "Comunicação proativa é fundamental", body: "2 grupos de WhatsApp obrigatórios:\n\nFROTA/GESTOR: operações e status de viagem.\n\nUTILIDADES: informações gerais — sempre reagir com 👍🏻.\n\nChip VIVO: prefixo 15 (015 + DDD + número).\n\nReunião mensal todo segundo sábado — obrigatória." },
-  { icon: "💰", tag: "REMUNERAÇÃO", title: "Salário e Prêmios", sub: "Seu desempenho define seu ganho", body: "FIXO: salário base + 30% periculosidade + DSR + Cartão Caju R$95/dia.\n\nPRÊMIOS VARIÁVEIS:\n— 3% Produtividade\n— 1% Comprometimento\n— 1% Não Avarias\n— 4% Extra Economia\n\nTotal: 9% sobre o faturamento.\nEx: R$56.000 = R$5.040 em prêmios." },
-  { icon: "📊", tag: "RANKING", title: "Ranking de Desempenho", sub: "Média dos últimos 6 meses", body: "Critérios:\n— Faturamento: até 5 pontos\n— Extra Economia: até 1,5 pontos\n— Ocorrências: até 2 pontos\n\nMínimo: 8,5 pontos.\nAbaixo de 8,0 por 3 meses = risco de rescisão.\n\nDisponível no 8quali e no WhatsApp." },
-  { icon: "⚠️", tag: "SEGURANÇA", title: "Segurança na Estrada", sub: "Regras inegociáveis", body: "VELOCIDADES:\n— Geral: 85 km/h\n— Chuva/neblina: 75 km/h\n— Químico: 80 km/h\n— Pedágios: 40 km/h\n\nJORNADA: parar até 23h / retomar às 04h.\n\nCinto sempre. Celular proibido ao volante. Nunca obstruir câmera." },
-  { icon: "🗺️", tag: "OPERAÇÃO", title: "Viagem — Passo a Passo", sub: "Protocolo obrigatório", body: "1. Receber programação no grupo\n2. Enviar macro INÍCIO DE VIAGEM\n3. Aguardar 'LIBERADO'\n4. Comunicar cada etapa\n5. Reaperto das cintas a cada 200 km\n6. Macro de FIM só com canhotos assinados\n7. Foto dos comprovantes no grupo" },
-  { icon: "🏆", tag: "CONCLUÍDO", title: "Pronto para o Trabalho!", sub: "Onboarding básico concluído", body: "Lembre sempre:\n— Comunicação proativa em cada etapa\n— Respeite velocidades e jornada\n— Cuide do veículo como se fosse seu\n— Ranking elevado = mais prêmios\n— Use o BEN para qualquer dúvida\n\nBem-vindo ao time Bendini!" },
-];
+const sb = {
+  get:    (table, query = "")      => api("sb_get",    { table, query }),
+  post:   (table, body)            => api("sb_post",   { table, body }),
+  patch:  (table, query, body)     => api("sb_patch",  { table, query, body }),
+  delete: (table, query)           => api("sb_delete", { table, query }),
+};
 
 const C = {
   BG:"#0e1a2b", NAV:"#091520", CARD:"#13223a", CARD2:"#182d4a",
   BORDER:"#1c3050", BORDER2:"#254070", RED:"#c0392b",
   WHITE:"#ffffff", TEXT:"#d8e8f5", MUTED:"#5c7d9e", MUTED2:"#3a5a7a", GREEN:"#2ecc71",
+  YELLOW:"#f39c12",
 };
 
-const fmt = (txt) => txt.split("\n").map((l, i) => {
+const fmt = (txt) => String(txt || "").split("\n").map((l, i) => {
   const b = l.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   return <p key={i} dangerouslySetInnerHTML={{ __html: b }} style={{ margin: "1px 0", lineHeight: 1.65 }} />;
 });
@@ -89,11 +41,21 @@ const formatCPF = (v) => {
           .replace(/(\d{3})(\d{3})/, "$1.$2")
           .replace(/(\d{3})/, "$1");
 };
-
 const cleanCPF = (v) => v.replace(/\D/g, "");
 
+const ONBOARDING = [
+  { icon:"🚛", tag:"BOAS-VINDAS", title:"Bem-vindo à Bendini", sub:"Você agora é um Gestor de Unidade Móvel", body:"Essa é a denominação especial que damos aos nossos motoristas, reconhecendo sua importância estratégica.\n\n\"Desejamos as boas-vindas, muitas realizações e sucesso.\"\n— Everton Pereira Bendini" },
+  { icon:"📋", tag:"INTEGRAÇÃO", title:"Primeiros 2 Dias", sub:"Apresentação em todos os setores", body:"Você será conduzido pelo seu gestor direto em uma integração completa.\n\nNo primeiro dia você recebe:\n— Kit de EPIs completo\n— Crachá e uniforme\n— Chip corporativo VIVO\n— Inclusão nos grupos de WhatsApp\n\nUso obrigatório: calça jeans ou brim + sapato de segurança + crachá." },
+  { icon:"📡", tag:"COMUNICAÇÃO", title:"Grupos e Comunicação", sub:"Comunicação proativa é fundamental", body:"2 grupos de WhatsApp obrigatórios:\n\nFROTA/GESTOR: operações e status de viagem.\nUTILIDADES: informações gerais — sempre reagir com 👍🏻.\n\nChip VIVO: prefixo 15 (015 + DDD + número).\nReunião mensal todo segundo sábado — obrigatória." },
+  { icon:"💰", tag:"REMUNERAÇÃO", title:"Salário e Prêmios", sub:"Seu desempenho define seu ganho", body:"FIXO: salário base + 30% periculosidade + DSR + Cartão Caju R$95/dia.\n\nPRÊMIOS VARIÁVEIS:\n— 3% Produtividade\n— 1% Comprometimento\n— 1% Não Avarias\n— 4% Extra Economia\n\nTotal: 9% sobre o faturamento." },
+  { icon:"📊", tag:"RANKING", title:"Ranking de Desempenho", sub:"Média dos últimos 6 meses", body:"Critérios:\n— Faturamento: até 5 pontos\n— Extra Economia: até 1,5 pontos\n— Ocorrências: até 2 pontos\n\nMínimo: 8,5 pontos.\nAbaixo de 8,0 por 3 meses = risco de rescisão." },
+  { icon:"⚠️", tag:"SEGURANÇA", title:"Segurança na Estrada", sub:"Regras inegociáveis", body:"VELOCIDADES:\n— Geral: 85 km/h\n— Chuva/neblina: 75 km/h\n— Químico: 80 km/h\n— Pedágios: 40 km/h\n\nJORNADA: parar até 23h / retomar às 04h.\nCinto sempre. Celular proibido ao volante." },
+  { icon:"🗺️", tag:"OPERAÇÃO", title:"Viagem — Passo a Passo", sub:"Protocolo obrigatório", body:"1. Receber programação no grupo\n2. Enviar macro INÍCIO DE VIAGEM\n3. Aguardar 'LIBERADO'\n4. Comunicar cada etapa\n5. Reaperto das cintas a cada 200 km\n6. Macro de FIM só com canhotos assinados\n7. Foto dos comprovantes no grupo" },
+  { icon:"🏆", tag:"CONCLUÍDO", title:"Pronto para o Trabalho!", sub:"Onboarding básico concluído", body:"Lembre sempre:\n— Comunicação proativa em cada etapa\n— Respeite velocidades e jornada\n— Cuide do veículo como se fosse seu\n— Ranking elevado = mais prêmios\n— Use o BEN para qualquer dúvida\n\nBem-vindo ao time Bendini!" },
+];
+
 // ══════════════════════════════════════════════════
-// TELA DE LOGIN
+// LOGIN
 // ══════════════════════════════════════════════════
 function LoginScreen({ onLogin, onAdm }) {
   const [cpf, setCpf] = useState("");
@@ -108,11 +70,8 @@ function LoginScreen({ onLogin, onAdm }) {
     setLoading(true); setErro("");
     try {
       const data = await sb.get("motoristas", `cpf=eq.${c}&ativo=eq.true`);
-      if (!data || data.length === 0) {
-        setErro("CPF não encontrado ou inativo. Fale com seu gestor.");
-      } else {
-        onLogin({ cpf: c, nome: data[0].nome });
-      }
+      if (!Array.isArray(data) || data.length === 0) setErro("CPF não encontrado ou inativo. Fale com seu gestor.");
+      else onLogin({ cpf: c, nome: data[0].nome });
     } catch { setErro("Erro de conexão. Tente novamente."); }
     setLoading(false);
   };
@@ -131,8 +90,7 @@ function LoginScreen({ onLogin, onAdm }) {
           <div style={{ fontSize:9, letterSpacing:3.5, color:C.MUTED, textTransform:"uppercase", marginTop:2, fontWeight:600 }}>Operador Logístico</div>
         </div>
       </div>
-
-      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"36px 32px", width:"100%", maxWidth:380 }}>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"36px 32px", width:"100%", maxWidth:400 }}>
         {!admMode ? (
           <>
             <div style={{ fontSize:10, color:C.RED, letterSpacing:2.5, fontWeight:900, textTransform:"uppercase", marginBottom:10 }}>Acesso ao Agente BEN</div>
@@ -143,7 +101,7 @@ function LoginScreen({ onLogin, onAdm }) {
               style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"12px 14px", color:C.WHITE, fontSize:16, outline:"none", fontFamily:"inherit", marginBottom:8, letterSpacing:2 }} />
             {erro && <div style={{ fontSize:12, color:C.RED, marginBottom:8 }}>{erro}</div>}
             <button onClick={entrar} disabled={loading} style={{ width:"100%", padding:"13px", background:loading?C.CARD2:C.RED, border:"none", borderRadius:2, color:C.WHITE, fontWeight:900, cursor:loading?"not-allowed":"pointer", fontSize:11, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", marginTop:8 }}>
-              {loading ? "Verificando..." : "Acessar →"}
+              {loading?"Verificando...":"Acessar →"}
             </button>
             <button onClick={() => { setAdmMode(true); setErro(""); }} style={{ width:"100%", padding:"10px", background:"none", border:`1px solid ${C.BORDER}`, borderRadius:2, color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"inherit", marginTop:10 }}>
               Acesso ADM
@@ -157,12 +115,8 @@ function LoginScreen({ onLogin, onAdm }) {
             <input type="password" value={senha} onChange={e => setSenha(e.target.value)} onKeyDown={e => e.key==="Enter" && entrarAdm()} placeholder="••••••••••" autoFocus
               style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"12px 14px", color:C.WHITE, fontSize:15, outline:"none", fontFamily:"inherit", marginBottom:8 }} />
             {erro && <div style={{ fontSize:12, color:C.RED, marginBottom:8 }}>{erro}</div>}
-            <button onClick={entrarAdm} style={{ width:"100%", padding:"13px", background:C.RED, border:"none", borderRadius:2, color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:11, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", marginTop:8 }}>
-              Entrar →
-            </button>
-            <button onClick={() => { setAdmMode(false); setErro(""); setSenha(""); }} style={{ width:"100%", padding:"10px", background:"none", border:`1px solid ${C.BORDER}`, borderRadius:2, color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"inherit", marginTop:10 }}>
-              ← Voltar
-            </button>
+            <button onClick={entrarAdm} style={{ width:"100%", padding:"13px", background:C.RED, border:"none", borderRadius:2, color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:11, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", marginTop:8 }}>Entrar →</button>
+            <button onClick={() => { setAdmMode(false); setErro(""); setSenha(""); }} style={{ width:"100%", padding:"10px", background:"none", border:`1px solid ${C.BORDER}`, borderRadius:2, color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"inherit", marginTop:10 }}>← Voltar</button>
           </>
         )}
       </div>
@@ -177,28 +131,34 @@ function LoginScreen({ onLogin, onAdm }) {
 function PainelAdm({ onSair }) {
   const [aba, setAba] = useState("motoristas");
   const [motoristas, setMotoristas] = useState([]);
-  const [rankings, setRankings] = useState([]);
+  const [quizzes, setQuizzes] = useState([]);
   const [regras, setRegras] = useState([]);
   const [novoCpf, setNovoCpf] = useState("");
   const [novoNome, setNovoNome] = useState("");
   const [novaRegra, setNovaRegra] = useState({ titulo:"", conteudo:"" });
   const [editandoRegra, setEditandoRegra] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [gerando, setGerando] = useState(false);
   const [msg, setMsg] = useState("");
+  const [quizDetalhe, setQuizDetalhe] = useState(null);
+  const [tentativas, setTentativas] = useState([]);
+  const [motoristasList, setMotoristasList] = useState([]);
 
-  const showMsg = (m) => { setMsg(m); setTimeout(() => setMsg(""), 3000); };
+  const showMsg = (m, cor = C.GREEN) => { setMsg({ text: m, cor }); setTimeout(() => setMsg(""), 4000); };
 
-  useEffect(() => { carregarDados(); }, [aba]);
+  useEffect(() => { carregar(); }, [aba]);
 
-  const carregarDados = async () => {
+  const carregar = async () => {
     setLoading(true);
     try {
       if (aba === "motoristas") {
         const d = await sb.get("motoristas", "order=nome.asc");
         setMotoristas(Array.isArray(d) ? d : []);
-      } else if (aba === "ranking") {
-        const d = await sb.get("quiz_resultados", "order=percentual.desc");
-        setRankings(Array.isArray(d) ? d : []);
+      } else if (aba === "quizzes") {
+        const d = await sb.get("quizzes", "order=created_at.desc");
+        setQuizzes(Array.isArray(d) ? d : []);
+        const m = await sb.get("motoristas", "ativo=eq.true&order=nome.asc");
+        setMotoristasList(Array.isArray(m) ? m : []);
       } else if (aba === "regras") {
         const d = await sb.get("regras", "order=ordem.asc");
         setRegras(Array.isArray(d) ? d : []);
@@ -209,43 +169,60 @@ function PainelAdm({ onSair }) {
 
   const adicionarMotorista = async () => {
     const c = cleanCPF(novoCpf);
-    if (c.length !== 11 || !novoNome.trim()) { showMsg("Preencha CPF e nome completo."); return; }
+    if (c.length !== 11 || !novoNome.trim()) { showMsg("Preencha CPF e nome.", C.RED); return; }
     try {
       await sb.post("motoristas", { cpf: c, nome: novoNome.trim() });
       setNovoCpf(""); setNovoNome("");
-      showMsg("Motorista cadastrado com sucesso!");
-      carregarDados();
-    } catch { showMsg("Erro ao cadastrar."); }
+      showMsg("Motorista cadastrado!");
+      carregar();
+    } catch { showMsg("Erro ao cadastrar.", C.RED); }
   };
 
   const toggleMotorista = async (id, ativo) => {
     await sb.patch("motoristas", `id=eq.${id}`, { ativo: !ativo });
-    carregarDados();
+    carregar();
   };
 
   const salvarRegra = async () => {
-    if (!novaRegra.titulo.trim() || !novaRegra.conteudo.trim()) { showMsg("Preencha título e conteúdo."); return; }
-    if (editandoRegra) {
-      await sb.patch("regras", `id=eq.${editandoRegra}`, { titulo: novaRegra.titulo, conteudo: novaRegra.conteudo, updated_at: new Date().toISOString() });
-      setEditandoRegra(null);
-    } else {
-      await sb.post("regras", { titulo: novaRegra.titulo, conteudo: novaRegra.conteudo, ordem: regras.length });
-    }
-    setNovaRegra({ titulo:"", conteudo:"" });
-    showMsg("Regra salva!");
-    carregarDados();
+    if (!novaRegra.titulo.trim() || !novaRegra.conteudo.trim()) { showMsg("Preencha título e conteúdo.", C.RED); return; }
+    try {
+      if (editandoRegra) {
+        await sb.patch("regras", `id=eq.${editandoRegra}`, { titulo: novaRegra.titulo, conteudo: novaRegra.conteudo, updated_at: new Date().toISOString() });
+        setEditandoRegra(null);
+        showMsg("Regra atualizada!");
+      } else {
+        const result = await sb.post("regras", { titulo: novaRegra.titulo, conteudo: novaRegra.conteudo, ordem: regras.length, ativo: true });
+        const regra = Array.isArray(result) ? result[0] : result;
+        showMsg("Regra salva! Gerando quiz com IA...", C.YELLOW);
+        setGerando(true);
+        try {
+          const qr = await api("gerar_quiz", { regra_id: regra.id, titulo: novaRegra.titulo, conteudo: novaRegra.conteudo });
+          if (qr.ok) showMsg(`Quiz gerado com ${qr.total} perguntas! ✓`);
+          else showMsg("Regra salva, mas erro ao gerar quiz.", C.YELLOW);
+        } catch { showMsg("Regra salva, mas erro ao gerar quiz.", C.YELLOW); }
+        setGerando(false);
+      }
+      setNovaRegra({ titulo:"", conteudo:"" });
+      carregar();
+    } catch { showMsg("Erro ao salvar.", C.RED); }
   };
 
   const excluirRegra = async (id) => {
     await sb.delete("regras", `id=eq.${id}`);
     showMsg("Regra excluída.");
-    carregarDados();
+    carregar();
+  };
+
+  const verDetalheQuiz = async (quiz) => {
+    setQuizDetalhe(quiz);
+    const t = await sb.get("quiz_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`);
+    setTentativas(Array.isArray(t) ? t : []);
   };
 
   const ABAS = [
     { id:"motoristas", label:"Motoristas" },
-    { id:"ranking", label:"Ranking Quiz" },
-    { id:"regras", label:"Regras" },
+    { id:"quizzes",    label:"Quizzes" },
+    { id:"regras",     label:"Regras" },
   ];
 
   return (
@@ -256,15 +233,16 @@ function PainelAdm({ onSair }) {
           <div style={{ fontSize:18, fontWeight:900, letterSpacing:2, color:C.WHITE, textTransform:"uppercase", lineHeight:1 }}>Bendini</div>
           <div style={{ fontSize:8, letterSpacing:3, color:C.MUTED, textTransform:"uppercase", marginTop:3, fontWeight:600 }}>Painel ADM</div>
         </div>
-        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
-          {msg && <span style={{ fontSize:11, color:C.GREEN, fontWeight:700 }}>{msg}</span>}
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:12 }}>
+          {msg && <span style={{ fontSize:11, color:msg.cor||C.GREEN, fontWeight:700 }}>{msg.text}</span>}
+          {gerando && <span style={{ fontSize:11, color:C.YELLOW, fontWeight:700 }}>⚙️ Gerando quiz...</span>}
           <button onClick={onSair} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"4px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>Sair</button>
         </div>
       </div>
 
       <div style={{ background:C.NAV, borderBottom:`1px solid ${C.BORDER}`, display:"flex", flexShrink:0 }}>
         {ABAS.map(a => (
-          <button key={a.id} onClick={() => setAba(a.id)} style={{ flex:1, padding:"13px 4px", background:a.id===aba?C.CARD:"none", border:"none", borderBottom:a.id===aba?`2px solid ${C.RED}`:"2px solid transparent", color:a.id===aba?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>{a.label}</button>
+          <button key={a.id} onClick={() => { setAba(a.id); setQuizDetalhe(null); }} style={{ flex:1, padding:"13px 4px", background:a.id===aba?C.CARD:"none", border:"none", borderBottom:a.id===aba?`2px solid ${C.RED}`:"2px solid transparent", color:a.id===aba?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>{a.label}</button>
         ))}
       </div>
 
@@ -281,13 +259,12 @@ function PainelAdm({ onSair }) {
                 style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:12 }} />
               <button onClick={adicionarMotorista} style={{ background:C.RED, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>+ Cadastrar</button>
             </div>
-
-            <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{motoristas.length} motoristas cadastrados</div>
+            <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{motoristas.length} motoristas</div>
             <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
               {loading ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando...</div> :
                 motoristas.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum motorista cadastrado.</div> :
                 motoristas.map((m, i) => (
-                  <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<motoristas.length-1?`1px solid ${C.BORDER}`:"none", background:m.ativo?"transparent":"rgba(192,57,43,0.05)" }}>
+                  <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<motoristas.length-1?`1px solid ${C.BORDER}`:"none" }}>
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:14, fontWeight:700, color:m.ativo?C.WHITE:C.MUTED }}>{m.nome}</div>
                       <div style={{ fontSize:11, color:C.MUTED, letterSpacing:1 }}>{formatCPF(m.cpf)}</div>
@@ -303,28 +280,88 @@ function PainelAdm({ onSair }) {
           </div>
         )}
 
-        {/* RANKING QUIZ */}
-        {aba === "ranking" && (
+        {/* QUIZZES */}
+        {aba === "quizzes" && !quizDetalhe && (
           <div>
-            <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>Ranking por melhor desempenho</div>
+            <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>
+              {quizzes.length} quizzes gerados pela IA
+            </div>
             <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
-              {loading ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando...</div> :
-                rankings.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum resultado ainda.</div> :
-                rankings.map((r, i) => (
-                  <div key={r.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<rankings.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                    <div style={{ fontSize:18, fontWeight:900, color:i===0?"#f1c40f":i===1?C.MUTED:i===2?"#cd7f32":C.MUTED2, minWidth:28 }}>#{i+1}</div>
+              {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+                quizzes.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum quiz ainda. Adicione regras para gerar quizzes automaticamente.</div> :
+                quizzes.map((q, i) => (
+                  <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<quizzes.length-1?`1px solid ${C.BORDER}`:"none" }}>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{r.nome}</div>
-                      <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(r.cpf)} — {new Date(r.created_at).toLocaleDateString("pt-BR")}</div>
+                      <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                      <div style={{ fontSize:11, color:C.MUTED }}>{new Date(q.created_at).toLocaleDateString("pt-BR")}</div>
+                    </div>
+                    <div style={{ fontSize:9, color:C.GREEN, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>{q.status}</div>
+                    <button onClick={() => verDetalheQuiz(q)} style={{ background:C.RED, border:"none", borderRadius:2, padding:"6px 14px", color:C.WHITE, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>
+                      Ver Respostas
+                    </button>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        )}
+
+        {/* DETALHE QUIZ */}
+        {aba === "quizzes" && quizDetalhe && (
+          <div>
+            <button onClick={() => setQuizDetalhe(null)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
+            <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"16px 20px", marginBottom:16 }}>
+              <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Quiz</div>
+              <div style={{ fontSize:18, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
+            </div>
+
+            {/* Motoristas que responderam */}
+            <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>
+              ✓ Responderam ({tentativas.length})
+            </div>
+            <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
+              {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum motorista respondeu ainda.</div> :
+                tentativas.map((t, i) => (
+                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.motorista_nome}</div>
+                      <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.motorista_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")} {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })}</div>
                     </div>
                     <div style={{ textAlign:"right" }}>
-                      <div style={{ fontSize:18, fontWeight:900, color:r.percentual>=80?C.GREEN:r.percentual>=60?"#f39c12":C.RED }}>{r.percentual.toFixed(0)}%</div>
-                      <div style={{ fontSize:10, color:C.MUTED }}>{r.score}/{r.total}</div>
+                      <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
+                      <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
                     </div>
                   </div>
                 ))
               }
             </div>
+
+            {/* Motoristas que NÃO responderam */}
+            {(() => {
+              const responderam = new Set(tentativas.map(t => t.motorista_cpf));
+              const pendentes = motoristasList.filter(m => !responderam.has(m.cpf));
+              return (
+                <>
+                  <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>
+                    ✗ Pendentes ({pendentes.length})
+                  </div>
+                  <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+                    {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos os motoristas responderam!</div> :
+                      pendentes.map((m, i) => (
+                        <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                          <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{m.nome}</div>
+                            <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
+                          </div>
+                          <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -335,13 +372,18 @@ function PainelAdm({ onSair }) {
               <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
                 {editandoRegra ? "Editar Regra" : "Nova Regra"}
               </div>
+              {!editandoRegra && (
+                <div style={{ fontSize:12, color:C.YELLOW, marginBottom:12, lineHeight:1.5 }}>
+                  ⚡ Ao salvar uma regra nova, a IA gera automaticamente 10 perguntas de quiz para os motoristas.
+                </div>
+              )}
               <input value={novaRegra.titulo} onChange={e => setNovaRegra(p => ({...p, titulo:e.target.value}))} placeholder="Título da regra"
                 style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:8 }} />
               <textarea value={novaRegra.conteudo} onChange={e => setNovaRegra(p => ({...p, conteudo:e.target.value}))} placeholder="Conteúdo da regra..." rows={4}
                 style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginBottom:12, resize:"vertical", lineHeight:1.6 }} />
               <div style={{ display:"flex", gap:8 }}>
-                <button onClick={salvarRegra} style={{ background:C.RED, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
-                  {editandoRegra ? "Salvar Edição" : "+ Adicionar"}
+                <button onClick={salvarRegra} disabled={gerando} style={{ background:gerando?C.CARD2:C.RED, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:gerando?"not-allowed":"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                  {gerando?"Gerando quiz...":editandoRegra?"Salvar Edição":"+ Salvar e Gerar Quiz"}
                 </button>
                 {editandoRegra && (
                   <button onClick={() => { setEditandoRegra(null); setNovaRegra({titulo:"",conteudo:""}); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>
@@ -350,7 +392,7 @@ function PainelAdm({ onSair }) {
             </div>
 
             <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
-              {loading ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando...</div> :
+              {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
                 regras.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhuma regra cadastrada.</div> :
                 regras.map((r, i) => (
                   <div key={r.id} style={{ padding:"14px 16px", borderBottom:i<regras.length-1?`1px solid ${C.BORDER}`:"none" }}>
@@ -373,10 +415,226 @@ function PainelAdm({ onSair }) {
 }
 
 // ══════════════════════════════════════════════════
-// APP PRINCIPAL (MOTORISTA)
+// QUIZ DINÂMICO (por quiz_id)
+// ══════════════════════════════════════════════════
+function QuizDinamico({ quiz, usuario, onFim, onVoltar }) {
+  const [questoes, setQuestoes] = useState([]);
+  const [qi, setQi] = useState(0);
+  const [qsel, setQsel] = useState(null);
+  const [qshow, setQshow] = useState(false);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    sb.get("quiz_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`).then(d => {
+      setQuestoes(Array.isArray(d) ? d : []);
+      setLoading(false);
+    });
+  }, [quiz.id]);
+
+  const answer = (letra) => {
+    if (qsel) return;
+    setQsel(letra);
+    setQshow(true);
+    if (letra === questoes[qi].correta) setScore(s => s + 1);
+  };
+
+  const next = async () => {
+    if (qi + 1 >= questoes.length) {
+      const pct = ((score + (qsel === questoes[qi].correta ? 1 : 0)) / questoes.length) * 100;
+      const finalScore = score + (qsel === questoes[qi].correta ? 1 : 0);
+      await sb.post("quiz_tentativas", {
+        quiz_id: quiz.id,
+        motorista_cpf: usuario.cpf,
+        motorista_nome: usuario.nome,
+        score: finalScore,
+        total: questoes.length,
+        percentual: pct,
+      });
+      setDone(true);
+    } else {
+      setQi(i => i + 1);
+      setQsel(null);
+      setQshow(false);
+    }
+  };
+
+  const finalScore = done ? score : score + (qsel === questoes[qi]?.correta ? 1 : 0);
+  const pct = questoes.length > 0 ? (finalScore / questoes.length) * 100 : 0;
+
+  if (loading) return (
+    <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ color:C.MUTED, fontSize:13, letterSpacing:1 }}>Carregando questões...</div>
+    </div>
+  );
+
+  if (done) return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center" }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>{pct>=80?"🏆":pct>=60?"👍":"📚"}</div>
+        <div style={{ fontSize:9, color:C.RED, letterSpacing:2.5, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Resultado</div>
+        <div style={{ fontSize:48, fontWeight:900, color:C.WHITE, lineHeight:1 }}>{finalScore}<span style={{ fontSize:20, color:C.MUTED, fontWeight:400 }}>/{questoes.length}</span></div>
+        <div style={{ fontSize:22, fontWeight:900, color:pct>=80?C.GREEN:pct>=60?C.YELLOW:C.RED, marginTop:6 }}>{pct.toFixed(0)}%</div>
+        <div style={{ fontSize:13, color:C.MUTED, marginTop:14, marginBottom:8 }}>{quiz.titulo}</div>
+        <div style={{ fontSize:13, color:C.MUTED, marginBottom:24 }}>{pct>=80?"Excelente!":pct>=60?"Bom resultado. Revise os pontos errados.":"Revise a regra e tente novamente."}</div>
+        <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+          <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 20px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+          <button onClick={() => { setQi(0); setQsel(null); setQshow(false); setScore(0); setDone(false); }} style={{ background:C.RED, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", fontWeight:900 }}>↺ Refazer</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const q = questoes[qi];
+  const opts = [
+    { letra:"a", texto:q.opcao_a },
+    { letra:"b", texto:q.opcao_b },
+    { letra:"c", texto:q.opcao_c },
+    { letra:"d", texto:q.opcao_d },
+  ];
+
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
+      <div style={{ fontSize:11, color:C.MUTED, marginBottom:4 }}>{quiz.titulo}</div>
+      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+        <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, fontWeight:800, textTransform:"uppercase" }}>Pergunta {qi+1} de {questoes.length}</span>
+        <span style={{ fontSize:9, color:C.GREEN, letterSpacing:1, fontWeight:800 }}>{score} corretas</span>
+      </div>
+      <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:22 }}>
+        <div style={{ height:"100%", width:`${(qi/questoes.length)*100}%`, background:C.RED, borderRadius:1 }} />
+      </div>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"20px 18px", marginBottom:14 }}>
+        <div style={{ fontSize:9, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Questão {qi+1}</div>
+        <div style={{ fontSize:16, fontWeight:700, lineHeight:1.5, color:C.WHITE }}>{q.pergunta}</div>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
+        {opts.map(o => {
+          const isC = o.letra === q.correta;
+          const isSel = o.letra === qsel;
+          let bg=C.CARD, border=`1px solid ${C.BORDER}`, color=C.TEXT;
+          if (qshow) {
+            if (isC) { bg="rgba(46,204,113,0.07)"; border="1px solid #2ecc71"; color="#2ecc71"; }
+            else if (isSel) { bg="rgba(192,57,43,0.08)"; border=`1px solid ${C.RED}`; color="#e07070"; }
+          }
+          return (
+            <button key={o.letra} onClick={() => answer(o.letra)} style={{ background:bg, border, borderRadius:2, padding:"12px 16px", color, textAlign:"left", cursor:qsel?"default":"pointer", fontSize:14, lineHeight:1.4, width:"100%", display:"block", fontFamily:"inherit", transition:"all 0.15s" }}>
+              <span style={{ fontWeight:900, marginRight:10, color:C.MUTED2, fontSize:12 }}>{o.letra.toUpperCase()}.</span>{o.texto}
+            </button>
+          );
+        })}
+      </div>
+      {qshow && (
+        <>
+          <div style={{ background:qsel===q.correta?"rgba(46,204,113,0.07)":"rgba(192,57,43,0.08)", border:`1px solid ${qsel===q.correta?"#2ecc71":C.RED}`, borderRadius:2, padding:"12px 14px", marginBottom:14, fontSize:13, color:qsel===q.correta?"#2ecc71":"#e07070", lineHeight:1.65 }}>
+            {qsel===q.correta?"✓ Correto — ":"✗ Incorreto — "}{q.explicacao}
+          </div>
+          <button onClick={next} style={{ width:"100%", padding:"14px", background:C.RED, border:"none", borderRadius:2, color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+            {qi+1>=questoes.length?"Ver Resultado":"Próxima →"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// LISTA DE QUIZZES DO MOTORISTA
+// ══════════════════════════════════════════════════
+function ListaQuizzes({ usuario, onIniciar }) {
+  const [quizzes, setQuizzes] = useState([]);
+  const [tentativas, setTentativas] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      sb.get("quizzes", "status=eq.ativo&order=created_at.desc"),
+      sb.get("quiz_tentativas", `motorista_cpf=eq.${usuario.cpf}&order=created_at.desc`),
+    ]).then(([q, t]) => {
+      setQuizzes(Array.isArray(q) ? q : []);
+      setTentativas(Array.isArray(t) ? t : []);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando quizzes...</div>;
+
+  const tentativasPorQuiz = tentativas.reduce((acc, t) => {
+    if (!acc[t.quiz_id]) acc[t.quiz_id] = [];
+    acc[t.quiz_id].push(t);
+    return acc;
+  }, {});
+
+  const pendentes = quizzes.filter(q => !tentativasPorQuiz[q.id]);
+  const feitos = quizzes.filter(q => tentativasPorQuiz[q.id]);
+
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      {pendentes.length > 0 && (
+        <>
+          <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>
+            🔴 Pendentes ({pendentes.length})
+          </div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:20 }}>
+            {pendentes.map((q, i) => (
+              <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                  <div style={{ fontSize:11, color:C.MUTED }}>10 perguntas — Não respondido</div>
+                </div>
+                <button onClick={() => onIniciar(q)} style={{ background:C.RED, border:"none", borderRadius:2, padding:"8px 16px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:1.5, fontWeight:900, textTransform:"uppercase", fontFamily:"inherit" }}>
+                  Responder →
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {feitos.length > 0 && (
+        <>
+          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>
+            ✓ Respondidos ({feitos.length})
+          </div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {feitos.map((q, i) => {
+              const ts = tentativasPorQuiz[q.id];
+              const melhor = Math.max(...ts.map(t => t.percentual));
+              const ultima = ts[0];
+              return (
+                <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<feitos.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                    <div style={{ fontSize:11, color:C.MUTED }}>Melhor: {Number(melhor).toFixed(0)}% — {ts.length}x respondido</div>
+                  </div>
+                  <div style={{ textAlign:"right", marginRight:10 }}>
+                    <div style={{ fontSize:16, fontWeight:900, color:melhor>=80?C.GREEN:melhor>=60?C.YELLOW:C.RED }}>{Number(melhor).toFixed(0)}%</div>
+                  </div>
+                  <button onClick={() => onIniciar(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>
+                    Refazer
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {quizzes.length === 0 && (
+        <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center", color:C.MUTED, fontSize:13 }}>
+          Nenhum quiz disponível ainda. Aguarde o gestor adicionar novas regras.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// APP PRINCIPAL
 // ══════════════════════════════════════════════════
 export default function App() {
-  const [usuario, setUsuario] = useState(null); // { cpf, nome }
+  const [usuario, setUsuario] = useState(null);
   const [isAdm, setIsAdm] = useState(false);
   const [tab, setTab] = useState("chat");
   const [msgs, setMsgs] = useState([]);
@@ -387,15 +645,9 @@ export default function App() {
   const [ouvindo, setOuvindo] = useState(false);
   const [semMic, setSemMic] = useState(false);
   const recognitionRef = useRef(null);
-  // Onboarding
   const [step, setStep] = useState(0);
-  // Quiz
-  const [qi, setQi] = useState(0);
-  const [qsel, setQsel] = useState(null);
-  const [qscore, setQscore] = useState(0);
-  const [qdone, setQdone] = useState(false);
-  const [qshow, setQshow] = useState(false);
-  const [quizSalvo, setQuizSalvo] = useState(false);
+  const [quizAtivo, setQuizAtivo] = useState(null);
+  const [quizzesCount, setQuizzesCount] = useState(0);
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
@@ -404,15 +656,21 @@ export default function App() {
     setUsuario(user);
     setLoadingHist(true);
     try {
-      const [hist, regs] = await Promise.all([
+      const [hist, regs, qz, tent] = await Promise.all([
         sb.get("historico_conversa", `motorista_nome=eq.${encodeURIComponent(user.cpf)}&order=created_at.asc&limit=100`),
         sb.get("regras", "ativo=eq.true&order=ordem.asc"),
+        sb.get("quizzes", "status=eq.ativo"),
+        sb.get("quiz_tentativas", `motorista_cpf=eq.${user.cpf}`),
       ]);
       setRegrasAdm(Array.isArray(regs) ? regs : []);
+      const quizzesAtivos = Array.isArray(qz) ? qz : [];
+      const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
+      const pendentes = quizzesAtivos.filter(q => !respondidos.has(q.id)).length;
+      setQuizzesCount(pendentes);
       if (Array.isArray(hist) && hist.length > 0) {
         setMsgs(hist.map(m => ({ role:m.role, content:m.content })));
       } else {
-        setMsgs([{ role:"assistant", content:`Olá, **${user.nome}**! Sou o **BEN**, assistente oficial da Bendini Logística.\n\nEstou aqui para responder suas dúvidas sobre regras, procedimentos e tudo que você precisa saber para trabalhar na Bendini.\n\nComo posso ajudar?` }]);
+        setMsgs([{ role:"assistant", content:`Olá, **${user.nome}**! Sou o **BEN**, assistente oficial da Bendini Logística.\n\nEstou aqui para responder suas dúvidas sobre regras e procedimentos.\n\nComo posso ajudar?` }]);
       }
     } catch {
       setMsgs([{ role:"assistant", content:`Olá, **${user.nome}**! Sou o **BEN**.\n\nComo posso ajudar?` }]);
@@ -420,22 +678,13 @@ export default function App() {
     setLoadingHist(false);
   };
 
-  // Constrói knowledge base com regras do ADM
   const buildKnowledge = () => {
-    let base = `Você é o BEN, Assistente Oficial da Bendini Logística — agente de onboarding e instrução para Gestores de Unidade Móvel (motoristas próprios da Bendini). Responda sempre em português brasileiro.\n\nTOM E PERSONALIDADE:\nSeja firme e direto, mas acolhedor. Fale como um consultor experiente que respeita quem está do outro lado — nunca arrogante, nunca julgando. O objetivo é que o motorista saia da conversa se sentindo orientado e capaz, não constrangido.\n\n`;
+    let base = `Você é o BEN, Assistente Oficial da Bendini Logística — agente de onboarding e instrução para Gestores de Unidade Móvel. Responda sempre em português brasileiro.\n\nTOM: Seja firme e direto, mas acolhedor. Fale como um consultor experiente.\n\n`;
     if (regrasAdm.length > 0) {
       base += "=== REGRAS E PROCEDIMENTOS BENDINI ===\n";
       regrasAdm.forEach(r => { base += `\n${r.titulo.toUpperCase()}:\n${r.conteudo}\n`; });
-    } else {
-      base += `=== SOBRE A BENDINI ===\nFundada em 1986 por Everton Bendini. Sede: Penha/SC, BR-101. Certificações: ISO 9001, ISO 14001, SASSMAQ.\n\n=== VELOCIDADE ===\n- Máximo: 85 km/h. Tolerância: até 8 picos/semana.\n- Produto químico: máx 80 km/h. Chuva/neblina: 75 km/h. Pedágios: 40 km/h.\n\n=== PRÊMIOS VARIÁVEIS ===\n- 3% Produtividade + 1% Comprometimento + 1% Não Avarias + 4% Extra Economia = 9% total.\n- Cartão Caju: R$95/dia trabalhado.\n\n=== JORNADA ===\n- Parar até 23h. Retorno somente a partir das 04h.\n\n=== PROIBIÇÕES ===\n- Obstruir câmera interna, comboio < 1000m, veículo ligado > 3 min parado, calça de moletom, dirigir de chinelo, recusar cargas.`;
     }
     return base;
-  };
-
-  const saveMsg = async (role, content) => {
-    try {
-      await sb.post("historico_conversa", { motorista_nome: usuario.cpf, role, content });
-    } catch {}
   };
 
   const send = async () => {
@@ -446,15 +695,9 @@ export default function App() {
     setMsgs(newMsgs);
     setLoading(true);
     try {
-      const res = await fetch("/api/chat", {
-        method:"POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ action:"ai_chat", model:"claude-haiku-4-5-20251001", max_tokens:1000, system:buildKnowledge(), messages:newMsgs, motorista:usuario.cpf }),
-      });
-      const d = await res.json();
-      const reply = d.content?.[0]?.text || "Não foi possível processar. Tente novamente.";
+      const res = await api("ai_chat", { model:"claude-haiku-4-5-20251001", max_tokens:1000, system:buildKnowledge(), messages:newMsgs, motorista:usuario.cpf });
+      const reply = res.content?.[0]?.text || "Não foi possível processar. Tente novamente.";
       setMsgs(p => [...p, { role:"assistant", content:reply }]);
-      await saveMsg("assistant", reply);
     } catch { setMsgs(p => [...p, { role:"assistant", content:"Erro de conexão. Tente novamente." }]); }
     setLoading(false);
   };
@@ -462,55 +705,21 @@ export default function App() {
   const toggleMic = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setSemMic(true); return; }
-
-    if (ouvindo) {
-      recognitionRef.current?.stop();
-      setOuvindo(false);
-      return;
-    }
-
+    if (ouvindo) { recognitionRef.current?.stop(); setOuvindo(false); return; }
     const rec = new SR();
-    rec.lang = "pt-BR";
-    rec.continuous = false;
-    rec.interimResults = false;
+    rec.lang = "pt-BR"; rec.continuous = false; rec.interimResults = false;
     recognitionRef.current = rec;
-
     rec.onstart = () => setOuvindo(true);
     rec.onend = () => setOuvindo(false);
     rec.onerror = () => setOuvindo(false);
-    rec.onresult = (e) => {
-      const txt = e.results[0][0].transcript;
-      setInput(prev => prev ? prev + " " + txt : txt);
-    };
+    rec.onresult = (e) => { const txt = e.results[0][0].transcript; setInput(prev => prev ? prev + " " + txt : txt); };
     rec.start();
   };
-
-  const answerQuiz = (idx) => {
-    if (qsel !== null) return;
-    setQsel(idx); setQshow(true);
-    if (idx === QUIZ_BASE[qi].c) setQscore(s => s + 1);
-  };
-
-  const nextQ = () => {
-    if (qi + 1 >= QUIZ_BASE.length) setQdone(true);
-    else { setQi(i => i+1); setQsel(null); setQshow(false); }
-  };
-
-  const resetQ = () => { setQi(0); setQsel(null); setQscore(0); setQdone(false); setQshow(false); setQuizSalvo(false); };
-
-  const salvarResultado = async () => {
-    if (quizSalvo) return;
-    const pct = (qscore / QUIZ_BASE.length) * 100;
-    await sb.post("quiz_resultados", { cpf:usuario.cpf, nome:usuario.nome, score:qscore, total:QUIZ_BASE.length, percentual:pct });
-    setQuizSalvo(true);
-  };
-
-  useEffect(() => { if (qdone && !quizSalvo) salvarResultado(); }, [qdone]);
 
   const TABS = [
     { id:"chat", label:"Assistente IA" },
     { id:"onboarding", label:"Onboarding" },
-    { id:"quiz", label:"Quiz" },
+    { id:"quiz", label:"Quiz", badge: quizzesCount > 0 ? quizzesCount : null },
   ];
 
   if (isAdm) return <PainelAdm onSair={() => setIsAdm(false)} />;
@@ -518,7 +727,7 @@ export default function App() {
   if (loadingHist) return (
     <div style={{ minHeight:"100vh", background:C.BG, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Barlow','Segoe UI',sans-serif" }}>
       <div style={{ textAlign:"center" }}>
-        <div style={{ fontSize:13, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Carregando histórico...</div>
+        <div style={{ fontSize:13, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Carregando...</div>
         <div style={{ display:"flex", gap:6, justifyContent:"center", marginTop:16 }}>
           {[0,1,2].map(j => <div key={j} style={{ width:8, height:8, borderRadius:"50%", background:C.RED, animation:`bpulse 1s ${j*0.22}s infinite` }} />)}
         </div>
@@ -550,7 +759,10 @@ export default function App() {
 
       <div style={{ background:C.NAV, borderBottom:`1px solid ${C.BORDER}`, display:"flex", flexShrink:0 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ flex:1, padding:"13px 4px", background:t.id===tab?C.CARD:"none", border:"none", borderBottom:t.id===tab?`2px solid ${C.RED}`:"2px solid transparent", color:t.id===tab?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>{t.label}</button>
+          <button key={t.id} onClick={() => { setTab(t.id); setQuizAtivo(null); }} style={{ flex:1, padding:"13px 4px", background:t.id===tab?C.CARD:"none", border:"none", borderBottom:t.id===tab?`2px solid ${C.RED}`:"2px solid transparent", color:t.id===tab?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase", position:"relative" }}>
+            {t.label}
+            {t.badge && <span style={{ position:"absolute", top:6, right:"calc(50% - 20px)", background:C.RED, color:C.WHITE, borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900 }}>{t.badge}</span>}
+          </button>
         ))}
       </div>
 
@@ -579,33 +791,19 @@ export default function App() {
               <div ref={endRef} />
             </div>
             <div style={{ padding:"6px 16px 8px", display:"flex", gap:7, overflowX:"auto", flexShrink:0 }}>
-              {["Como funcionam os prêmios?", "Quais são as proibições?", "Como é o ranking?", "Velocidades na estrada"].map(q => (
+              {["Como funcionam os prêmios?","Quais são as proibições?","Como é o ranking?","Velocidades na estrada"].map(q => (
                 <button key={q} onClick={() => setInput(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, fontSize:10, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, letterSpacing:0.8, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>{q}</button>
               ))}
             </div>
             <div style={{ padding:"10px 16px 12px", borderTop:`1px solid ${C.BORDER}`, display:"flex", gap:8, background:C.NAV, flexShrink:0 }}>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder={ouvindo ? "Ouvindo... fale agora" : "Digite ou use o microfone..."}
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder={ouvindo?"Ouvindo... fale agora":"Digite ou use o microfone..."}
                 style={{ flex:1, background:C.CARD, border:`1px solid ${ouvindo?C.RED:C.BORDER2}`, borderRadius:2, padding:"11px 14px", color:C.TEXT, fontSize:13, outline:"none", fontFamily:"inherit", transition:"border 0.2s" }} />
-              {/* Botão microfone */}
-              <button onClick={toggleMic} title={semMic?"Microfone não suportado neste navegador":ouvindo?"Parar gravação":"Falar"} style={{
-                background: ouvindo ? C.RED : "rgba(192,57,43,0.15)",
-                border: `1px solid ${ouvindo?C.RED:C.BORDER2}`,
-                borderRadius:2, width:46, cursor:"pointer",
-                color: ouvindo ? C.WHITE : C.MUTED,
-                fontSize:18, display:"flex", alignItems:"center", justifyContent:"center",
-                animation: ouvindo ? "micPulse 1s infinite" : "none",
-                flexShrink:0,
-              }}>
-                {ouvindo ? "⏹" : "🎤"}
+              <button onClick={toggleMic} style={{ background:ouvindo?C.RED:"rgba(192,57,43,0.15)", border:`1px solid ${ouvindo?C.RED:C.BORDER2}`, borderRadius:2, width:46, cursor:"pointer", color:ouvindo?C.WHITE:C.MUTED, fontSize:18, display:"flex", alignItems:"center", justifyContent:"center", animation:ouvindo?"micPulse 1s infinite":"none", flexShrink:0 }}>
+                {ouvindo?"⏹":"🎤"}
               </button>
-              {/* Botão enviar */}
               <button onClick={send} disabled={loading||!input.trim()} style={{ background:(!loading&&input.trim())?C.RED:C.CARD2, border:"none", borderRadius:2, width:46, cursor:(!loading&&input.trim())?"pointer":"not-allowed", color:(!loading&&input.trim())?C.WHITE:C.MUTED2, fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, flexShrink:0 }}>›</button>
             </div>
-            {semMic && (
-              <div style={{ padding:"6px 16px 10px", fontSize:11, color:C.RED, background:C.NAV }}>
-                ⚠️ Microfone não suportado. Use Chrome ou Edge.
-              </div>
-            )}
+            {semMic && <div style={{ padding:"6px 16px 10px", fontSize:11, color:C.RED, background:C.NAV }}>⚠️ Microfone não suportado. Use Chrome ou Edge.</div>}
           </div>
         )}
 
@@ -637,62 +835,9 @@ export default function App() {
         )}
 
         {/* QUIZ */}
-        {tab === "quiz" && (
-          <div style={{ flex:1, overflowY:"auto", padding:20 }}>
-            {qdone ? (
-              <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center" }}>
-                <div style={{ fontSize:48, marginBottom:16 }}>{qscore/QUIZ_BASE.length>=0.8?"🏆":qscore/QUIZ_BASE.length>=0.6?"👍":"📚"}</div>
-                <div style={{ fontSize:9, color:C.RED, letterSpacing:2.5, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Resultado Final</div>
-                <div style={{ fontSize:54, fontWeight:900, color:C.WHITE, lineHeight:1 }}>{qscore}<span style={{ fontSize:20, color:C.MUTED, fontWeight:400 }}>/{QUIZ_BASE.length}</span></div>
-                <div style={{ fontSize:22, fontWeight:900, color:qscore/QUIZ_BASE.length>=0.8?C.GREEN:qscore/QUIZ_BASE.length>=0.6?"#f39c12":C.RED, marginTop:6 }}>{((qscore/QUIZ_BASE.length)*100).toFixed(0)}%</div>
-                <div style={{ fontSize:13, color:C.MUTED, marginTop:14, marginBottom:8, lineHeight:1.7 }}>
-                  {qscore/QUIZ_BASE.length>=0.8?"Excelente! Você conhece bem as regras da Bendini.":qscore/QUIZ_BASE.length>=0.6?"Bom resultado. Vale revisar alguns pontos.":"Revise o onboarding e tente novamente."}
-                </div>
-                {quizSalvo && <div style={{ fontSize:11, color:C.GREEN, marginBottom:20, fontWeight:700, letterSpacing:1 }}>✓ Resultado salvo no ranking</div>}
-                <button onClick={resetQ} style={{ background:C.RED, border:"none", borderRadius:2, padding:"13px 32px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>↺ Tentar Novamente</button>
-              </div>
-            ) : (
-              <>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-                  <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, fontWeight:800, textTransform:"uppercase" }}>Pergunta {qi+1} de {QUIZ_BASE.length}</span>
-                  <span style={{ fontSize:9, color:C.GREEN, letterSpacing:1, fontWeight:800 }}>{qscore} corretas</span>
-                </div>
-                <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:22 }}>
-                  <div style={{ height:"100%", width:`${(qi/QUIZ_BASE.length)*100}%`, background:C.RED, borderRadius:1 }} />
-                </div>
-                <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"20px 18px", marginBottom:14 }}>
-                  <div style={{ fontSize:9, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Questão {qi+1}</div>
-                  <div style={{ fontSize:16, fontWeight:700, lineHeight:1.5, color:C.WHITE }}>{QUIZ_BASE[qi].q}</div>
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
-                  {QUIZ_BASE[qi].opts.map((opt, idx) => {
-                    const isC=idx===QUIZ_BASE[qi].c, isSel=idx===qsel;
-                    let bg=C.CARD, border=`1px solid ${C.BORDER}`, color=C.TEXT;
-                    if (qshow) {
-                      if (isC) { bg="rgba(46,204,113,0.07)"; border="1px solid #2ecc71"; color="#2ecc71"; }
-                      else if (isSel) { bg="rgba(192,57,43,0.08)"; border=`1px solid ${C.RED}`; color="#e07070"; }
-                    }
-                    return (
-                      <button key={idx} onClick={() => answerQuiz(idx)} style={{ background:bg, border, borderRadius:2, padding:"12px 16px", color, textAlign:"left", cursor:qsel!==null?"default":"pointer", fontSize:14, lineHeight:1.4, width:"100%", display:"block", fontFamily:"inherit", fontWeight:isSel&&qshow?700:400, transition:"all 0.15s" }}>
-                        <span style={{ fontWeight:900, marginRight:10, color:C.MUTED2, fontSize:12 }}>{["A","B","C","D"][idx]}.</span>{opt}
-                      </button>
-                    );
-                  })}
-                </div>
-                {qshow && (
-                  <>
-                    <div style={{ background:qsel===QUIZ_BASE[qi].c?"rgba(46,204,113,0.07)":"rgba(192,57,43,0.08)", border:`1px solid ${qsel===QUIZ_BASE[qi].c?"#2ecc71":C.RED}`, borderRadius:2, padding:"12px 14px", marginBottom:14, fontSize:13, color:qsel===QUIZ_BASE[qi].c?"#2ecc71":"#e07070", lineHeight:1.65 }}>
-                      {qsel===QUIZ_BASE[qi].c?"✓ Correto — ":"✗ Incorreto — "}{QUIZ_BASE[qi].exp}
-                    </div>
-                    <button onClick={nextQ} style={{ width:"100%", padding:"14px", background:C.RED, border:"none", borderRadius:2, color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
-                      {qi+1>=QUIZ_BASE.length?"Ver Resultado":"Próxima →"}
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        {tab === "quiz" && !quizAtivo && <ListaQuizzes usuario={usuario} onIniciar={setQuizAtivo} />}
+        {tab === "quiz" && quizAtivo && <QuizDinamico quiz={quizAtivo} usuario={usuario} onFim={() => setQuizAtivo(null)} onVoltar={() => setQuizAtivo(null)} />}
+
       </div>
 
       <style>{`
