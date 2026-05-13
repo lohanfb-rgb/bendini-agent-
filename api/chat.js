@@ -11,7 +11,8 @@ module.exports = async function handler(req, res) {
   const H = { "apikey": KEY, "Authorization": `Bearer ${KEY}`, "Content-Type": "application/json" };
 
   const sbGet = async (table, query = "") => {
-    const r = await fetch(`${SB}/rest/v1/${table}?${query}`, { headers: H });
+    const decodedQuery = decodeURIComponent(query);
+    const r = await fetch(`${SB}/rest/v1/${table}?${decodedQuery}`, { headers: H });
     return r.json();
   };
   const sbPost = async (table, body) => {
