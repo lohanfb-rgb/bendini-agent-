@@ -135,12 +135,16 @@ Gere exatamente 10 perguntas praticas. Varie a posicao da resposta correta entre
       const { messages, system, model, max_tokens, motorista } = req.body;
       try {
         const lastMsg = messages[messages.length - 1];
-        await sbPost("historico_conversa", { motorista_nome: motorista, role: lastMsg.role, content: lastMsg.content });
+        // Salva texto da mensagem no histórico (extrai texto se for array com imagem)
+        const textoHistorico = Array.isArray(lastMsg.content)
+          ? (lastMsg.content.find(c => c.type === "text")?.text || "")
+          : lastMsg.content;
+        await sbPost("historico_conversa", { motorista_nome: motorista, role: lastMsg.role, content: textoHistorico });
 
         const r = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": AI, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({ model, max_tokens, system, messages }),
+          body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: max_tokens || 1000, system, messages }),
         });
         const d = await r.json();
         const reply = d.content?.[0]?.text || "";
