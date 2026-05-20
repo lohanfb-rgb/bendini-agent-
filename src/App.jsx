@@ -850,9 +850,133 @@ function QuizDinamico({ quiz, usuario, onFim, onVoltar }) {
 }
 
 // ══════════════════════════════════════════════════
+// REVISÃO DE ERROS DO QUIZ
+// ══════════════════════════════════════════════════
+function RevisaoQuiz({ quiz, usuario, onVoltar }) {
+  const [respostas, setRespostas] = useState([]);
+  const [questoes, setQuestoes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      sb.get("quiz_respostas", `motorista_nome=eq.${encodeURIComponent(usuario.nome)}&quiz_titulo=eq.${encodeURIComponent(quiz.titulo)}&order=created_at.desc&limit=100`),
+      sb.get("quiz_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`),
+    ]).then(([r, q]) => {
+      setRespostas(Array.isArray(r) ? r : []);
+      setQuestoes(Array.isArray(q) ? q : []);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando revisão...</div>;
+
+  const ultimaResposta = {};
+  respostas.forEach(r => { if (!ultimaResposta[r.questao_id]) ultimaResposta[r.questao_id] = r; });
+
+  const erros = Object.values(ultimaResposta).filter(r => !r.acertou);
+  const acertos = Object.values(ultimaResposta).filter(r => r.acertou);
+  const total = Object.values(ultimaResposta).length;
+  const pct = total > 0 ? Math.round((acertos.length / total) * 100) : 0;
+  const semDados = respostas.length === 0;
+
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
+
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"16px 20px", marginBottom:20 }}>
+        <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Revisão</div>
+        <div style={{ fontSize:17, fontWeight:900, color:C.WHITE, marginBottom:12 }}>{quiz.titulo}</div>
+        {!semDados && (
+          <div style={{ display:"flex", gap:20 }}>
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:24, fontWeight:900, color:pct>=80?C.GREEN:pct>=60?C.YELLOW:C.RED }}>{pct}%</div>
+              <div style={{ fontSize:10, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>Aproveitamento</div>
+            </div>
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:24, fontWeight:900, color:C.GREEN }}>{acertos.length}</div>
+              <div style={{ fontSize:10, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>Acertos</div>
+            </div>
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:24, fontWeight:900, color:C.RED }}>{erros.length}</div>
+              <div style={{ fontSize:10, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>Erros</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {semDados ? (
+        <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:24 }}>
+          <div style={{ textAlign:"center", marginBottom:20 }}>
+            <div style={{ fontSize:28, marginBottom:8 }}>📋</div>
+            <div style={{ fontSize:14, color:C.WHITE, fontWeight:700, marginBottom:6 }}>Gabarito das questões</div>
+            <div style={{ fontSize:12, color:C.MUTED, lineHeight:1.6 }}>Esta tentativa foi feita antes do sistema de revisão. Refaça o quiz para ver seus erros em detalhes.</div>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {questoes.map((q, i) => (
+              <div key={q.id} style={{ background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"12px 14px" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.WHITE, marginBottom:8 }}>#{i+1} {q.pergunta}</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  {["a","b","c","d"].map(l => (
+                    <div key={l} style={{ padding:"4px 10px", borderRadius:2, background:q.correta===l?"rgba(46,204,113,0.1)":C.CARD, border:`1px solid ${q.correta===l?"#2ecc71":C.BORDER}`, fontSize:12, color:q.correta===l?"#2ecc71":C.MUTED }}>
+                      <span style={{ fontWeight:900 }}>{l.toUpperCase()}.</span> {q[`opcao_${l}`]} {q.correta===l && "✓"}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          {erros.length > 0 && (
+            <>
+              <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:4 }}>✗ O que você errou ({erros.length})</div>
+              {erros.map((r, i) => {
+                const q = questoes.find(q => q.id === r.questao_id) || {};
+                return (
+                  <div key={i} style={{ background:C.CARD, border:`1px solid rgba(192,57,43,0.4)`, borderRadius:2, padding:"14px 16px" }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:12, lineHeight:1.5 }}>{r.pergunta}</div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12 }}>
+                      {["a","b","c","d"].map(l => {
+                        const isCorreta = l === r.correta;
+                        const isErrada = l === r.resposta_dada;
+                        if (!isCorreta && !isErrada) return null;
+                        return (
+                          <div key={l} style={{ padding:"8px 12px", borderRadius:2, background:isCorreta?"rgba(46,204,113,0.08)":"rgba(192,57,43,0.08)", border:`1px solid ${isCorreta?"#2ecc71":C.RED}`, fontSize:13, color:isCorreta?"#2ecc71":"#e07070", display:"flex", gap:8, alignItems:"center" }}>
+                            <span style={{ fontWeight:900, fontSize:11 }}>{l.toUpperCase()}.</span>
+                            <span style={{ flex:1 }}>{q[`opcao_${l}`] || ""}</span>
+                            <span style={{ fontSize:10, fontWeight:900 }}>{isCorreta?"✓ Correta":"✗ Sua resposta"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {q.explicacao && <div style={{ fontSize:12, color:C.MUTED, lineHeight:1.6, fontStyle:"italic" }}>💡 {q.explicacao}</div>}
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {acertos.length > 0 && (
+            <>
+              <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginTop:8, marginBottom:4 }}>✓ O que você acertou ({acertos.length})</div>
+              {acertos.map((r, i) => (
+                <div key={i} style={{ background:C.CARD, border:`1px solid rgba(46,204,113,0.2)`, borderRadius:2, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(46,204,113,0.15)", border:"1px solid #2ecc71", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"#2ecc71", flexShrink:0 }}>✓</div>
+                  <div style={{ fontSize:13, color:C.TEXT, lineHeight:1.5 }}>{r.pergunta}</div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
 // LISTA DE QUIZZES DO MOTORISTA
 // ══════════════════════════════════════════════════
-function ListaQuizzes({ usuario, onIniciar }) {
+function ListaQuizzes({ usuario, onIniciar, onRevisar }) {
   const [quizzes, setQuizzes] = useState([]);
   const [tentativas, setTentativas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -883,9 +1007,7 @@ function ListaQuizzes({ usuario, onIniciar }) {
     <div style={{ flex:1, overflowY:"auto", padding:20 }}>
       {pendentes.length > 0 && (
         <>
-          <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>
-            🔴 Pendentes ({pendentes.length})
-          </div>
+          <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>🔴 Pendentes ({pendentes.length})</div>
           <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:20 }}>
             {pendentes.map((q, i) => (
               <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
@@ -893,9 +1015,7 @@ function ListaQuizzes({ usuario, onIniciar }) {
                   <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
                   <div style={{ fontSize:11, color:C.MUTED }}>10 perguntas — Não respondido</div>
                 </div>
-                <button onClick={() => onIniciar(q)} style={{ background:C.RED, border:"none", borderRadius:2, padding:"8px 16px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:1.5, fontWeight:900, textTransform:"uppercase", fontFamily:"inherit" }}>
-                  Responder →
-                </button>
+                <button onClick={() => onIniciar(q)} style={{ background:C.RED, border:"none", borderRadius:2, padding:"8px 16px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:1.5, fontWeight:900, textTransform:"uppercase", fontFamily:"inherit" }}>Responder →</button>
               </div>
             ))}
           </div>
@@ -903,25 +1023,24 @@ function ListaQuizzes({ usuario, onIniciar }) {
       )}
       {feitos.length > 0 && (
         <>
-          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>
-            ✓ Respondidos ({feitos.length})
-          </div>
+          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>✓ Respondidos ({feitos.length})</div>
           <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
             {feitos.map((q, i) => {
               const ts = tentativasPorQuiz[q.id];
               const melhor = Math.max(...ts.map(t => t.percentual));
               return (
-                <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<feitos.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
-                    <div style={{ fontSize:11, color:C.MUTED }}>Melhor: {Number(melhor).toFixed(0)}% — {ts.length}x respondido</div>
+                <div key={q.id} style={{ padding:"14px 16px", borderBottom:i<feitos.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                      <div style={{ fontSize:11, color:C.MUTED }}>Melhor: {Number(melhor).toFixed(0)}% — {ts.length}x respondido</div>
+                    </div>
+                    <div style={{ fontSize:18, fontWeight:900, color:melhor>=80?C.GREEN:melhor>=60?C.YELLOW:C.RED }}>{Number(melhor).toFixed(0)}%</div>
                   </div>
-                  <div style={{ textAlign:"right", marginRight:10 }}>
-                    <div style={{ fontSize:16, fontWeight:900, color:melhor>=80?C.GREEN:melhor>=60?C.YELLOW:C.RED }}>{Number(melhor).toFixed(0)}%</div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={() => onRevisar(q)} style={{ flex:1, background:"rgba(192,57,43,0.1)", border:`1px solid rgba(192,57,43,0.4)`, borderRadius:2, padding:"8px 12px", color:C.RED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:800, textTransform:"uppercase", fontFamily:"inherit" }}>📋 Ver Erros</button>
+                    <button onClick={() => onIniciar(q)} style={{ flex:1, background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>↺ Refazer</button>
                   </div>
-                  <button onClick={() => onIniciar(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>
-                    Refazer
-                  </button>
                 </div>
               );
             })}
@@ -957,6 +1076,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const [step, setStep] = useState(0);
   const [quizAtivo, setQuizAtivo] = useState(null);
+  const [quizRevisando, setQuizRevisando] = useState(null);
   const [quizzesCount, setQuizzesCount] = useState(0);
   const endRef = useRef(null);
 
@@ -1103,7 +1223,7 @@ export default function App() {
 
       <div style={{ background:C.NAV, borderBottom:`1px solid ${C.BORDER}`, display:"flex", flexShrink:0 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => { setTab(t.id); setQuizAtivo(null); }} style={{ flex:1, padding:"13px 4px", background:t.id===tab?C.CARD:"none", border:"none", borderBottom:t.id===tab?`2px solid ${C.RED}`:"2px solid transparent", color:t.id===tab?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase", position:"relative" }}>
+          <button key={t.id} onClick={() => { setTab(t.id); setQuizAtivo(null); setQuizRevisando(null); }} style={{ flex:1, padding:"13px 4px", background:t.id===tab?C.CARD:"none", border:"none", borderBottom:t.id===tab?`2px solid ${C.RED}`:"2px solid transparent", color:t.id===tab?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase", position:"relative" }}>
             {t.label}
             {t.badge && <span style={{ position:"absolute", top:6, right:"calc(50% - 20px)", background:C.RED, color:C.WHITE, borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900 }}>{t.badge}</span>}
           </button>
@@ -1190,8 +1310,9 @@ export default function App() {
         )}
 
         {/* QUIZ */}
-        {tab === "quiz" && !quizAtivo && <ListaQuizzes usuario={usuario} onIniciar={setQuizAtivo} />}
+        {tab === "quiz" && !quizAtivo && !quizRevisando && <ListaQuizzes usuario={usuario} onIniciar={setQuizAtivo} onRevisar={setQuizRevisando} />}
         {tab === "quiz" && quizAtivo && <QuizDinamico quiz={quizAtivo} usuario={usuario} onFim={() => setQuizAtivo(null)} onVoltar={() => setQuizAtivo(null)} />}
+        {tab === "quiz" && quizRevisando && <RevisaoQuiz quiz={quizRevisando} usuario={usuario} onVoltar={() => setQuizRevisando(null)} />}
       </div>
 
       <style>{`
