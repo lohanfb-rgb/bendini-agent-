@@ -143,7 +143,7 @@ function PainelAdm({ onSair }) {
   const [quizDetalhe, setQuizDetalhe] = useState(null);
   const [tentativas, setTentativas] = useState([]);
   const [motoristasList, setMotoristasList] = useState([]);
-  const [iMsgs, setIMsgs] = useState([{ role:"assistant", content:"Olá! Sou seu assistente de inteligência. Pode me perguntar sobre motoristas, quizzes e resultados.\n\nExemplos:\n— Quais motoristas não responderam o quiz de velocidades?\n— Qual a média geral dos quizzes?\n— Quem tirou menos de 60%?" }]);
+  const [iMsgs, setIMsgs] = useState([{ role:"assistant", content:"Olá! Sou seu assistente de inteligência. Pode me perguntar sobre motoristas, quizzes e resultados.\n\nExemplos:\n— Quais motoristas não responderam o quiz de velocidades?\n— Qual a média geral dos quizzes?\n— Quem tirou menos de 60%?\n— Quais perguntas o motorista X errou?" }]);
   const [iInput, setIInput] = useState("");
   const [iLoading, setILoading] = useState(false);
   const iEndRef = useRef(null);
@@ -151,6 +151,7 @@ function PainelAdm({ onSair }) {
   const showMsg = (m, cor = C.GREEN) => { setMsg({ text: m, cor }); setTimeout(() => setMsg(""), 4000); };
 
   useEffect(() => { carregar(); }, [aba]);
+  useEffect(() => { iEndRef.current?.scrollIntoView({ behavior:"smooth" }); }, [iMsgs]);
 
   const carregar = async () => {
     setLoading(true);
@@ -230,6 +231,7 @@ function PainelAdm({ onSair }) {
     { id:"inteligencia", label:"Inteligência IA" },
   ];
 
+  // ── PATCH 1: sendInteligencia atualizado com quiz_respostas ──
   const sendInteligencia = async () => {
     if (!iInput.trim() || iLoading) return;
     const pergunta = iInput.trim();
@@ -237,34 +239,72 @@ function PainelAdm({ onSair }) {
     setIMsgs(p => [...p, { role:"user", content: pergunta }]);
     setILoading(true);
     try {
-      // Busca dados do banco para contextualizar a IA
-      const [mots, quizList, tentList] = await Promise.all([
+      const [mots, quizList, tentList, respostasList] = await Promise.all([
         sb.get("motoristas", "order=nome.asc"),
         sb.get("quizzes", "order=titulo.asc"),
         sb.get("quiz_tentativas", "order=created_at.desc&limit=500"),
+        sb.get("quiz_respostas", "order=created_at.desc&limit=2000"),
       ]);
 
-      const motoristasData = Array.isArray(mots) ? mots : [];
-      const quizzesData = Array.isArray(quizList) ? quizList : [];
-      const tentativasData = Array.isArray(tentList) ? tentList : [];
+      const motoristasData  = Array.isArray(mots)          ? mots          : [];
+      const quizzesData     = Array.isArray(quizList)       ? quizList       : [];
+      const tentativasData  = Array.isArray(tentList)       ? tentList       : [];
+      const respostasData   = Array.isArray(respostasList)  ? respostasList  : [];
 
-      // Monta resumo dos dados para a IA
-      const resumoMotoristas = motoristasData.map(m => `${m.nome} (CPF: ${m.cpf}, ${m.ativo ? "ativo" : "inativo"})`).join("\n");
+      // Resumo de motoristas
+      const resumoMotoristas = motoristasData
+        .map(m => `${m.nome} (CPF: ${m.cpf}, ${m.ativo ? "ativo" : "inativo"})`)
+        .join("\n");
 
+      // Resumo de quizzes
       const resumoQuizzes = quizzesData.map(q => {
         const tents = tentativasData.filter(t => t.quiz_id === q.id);
         const responderam = [...new Set(tents.map(t => t.motorista_cpf))];
         const ativos = motoristasData.filter(m => m.ativo);
         const naoResponderam = ativos.filter(m => !responderam.includes(m.cpf));
-        const media = tents.length > 0 ? (tents.reduce((s, t) => s + Number(t.percentual), 0) / tents.length).toFixed(1) : "0";
-        return `Quiz: ${q.titulo}\n  Responderam: ${responderam.length} motoristas | Média: ${media}%\n  Pendentes: ${naoResponderam.map(m => m.nome).join(", ") || "nenhum"}`;
+        const media = tents.length > 0
+          ? (tents.reduce((s, t) => s + Number(t.percentual), 0) / tents.length).toFixed(1)
+          : "0";
+        return `Quiz: ${q.titulo}\n  Responderam: ${responderam.length} | Média: ${media}%\n  Pendentes: ${naoResponderam.map(m => m.nome).join(", ") || "nenhum"}`;
       }).join("\n\n");
 
+      // Últimas tentativas
       const resumoTentativas = tentativasData.slice(0, 100).map(t =>
-        `${t.motorista_nome} | Quiz: ${quizzesData.find(q => q.id === t.quiz_id)?.titulo || t.quiz_id} | Nota: ${Number(t.percentual).toFixed(0)}% (${t.score}/${t.total}) | Data: ${new Date(t.created_at).toLocaleDateString("pt-BR")}`
+        `${t.motorista_nome} | Quiz: ${quizzesData.find(q => q.id === t.quiz_id)?.titulo || "?"} | Nota: ${Number(t.percentual).toFixed(0)}% (${t.score}/${t.total}) | ${new Date(t.created_at).toLocaleDateString("pt-BR")}`
       ).join("\n");
 
-      const contexto = `Você é um assistente de BI para o painel ADM da Bendini Logística. Responda perguntas sobre motoristas, quizzes e resultados com base nos dados abaixo. Seja direto e objetivo. Use listas quando necessário.
+      // Erros por motorista (perguntas específicas)
+      const erros = respostasData.filter(r => r.acertou === false);
+      const acertos = respostasData.filter(r => r.acertou === true);
+
+      const errosPorMotorista = {};
+      erros.forEach(r => {
+        const nome = r.motorista_nome || "desconhecido";
+        if (!errosPorMotorista[nome]) errosPorMotorista[nome] = [];
+        errosPorMotorista[nome].push(
+          `[${r.quiz_titulo || "Quiz"}] Pergunta: "${r.pergunta}" | Respondeu: "${r.resposta_dada}" | Correta: "${r.correta}"`
+        );
+      });
+
+      const resumoErros = Object.entries(errosPorMotorista)
+        .map(([nome, lista]) => `${nome} — ${lista.length} erro(s):\n  ${lista.slice(0, 15).join("\n  ")}`)
+        .join("\n\n");
+
+      // Perguntas com mais erros
+      const errosPorPergunta = {};
+      erros.forEach(r => {
+        const key = r.pergunta || "?";
+        errosPorPergunta[key] = (errosPorPergunta[key] || 0) + 1;
+      });
+      const topErros = Object.entries(errosPorPergunta)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([p, n]) => `${n}x erros — "${p}"`)
+        .join("\n");
+
+      const contexto = `Você é um assistente de BI para o painel ADM da Bendini Logística.
+Responda perguntas sobre motoristas, quizzes e resultados com base nos dados abaixo.
+Seja direto e objetivo. Use listas quando necessário.
 
 === MOTORISTAS CADASTRADOS ===
 ${resumoMotoristas}
@@ -273,11 +313,23 @@ ${resumoMotoristas}
 ${resumoQuizzes}
 
 === ÚLTIMAS TENTATIVAS (últimas 100) ===
-${resumoTentativas}`;
+${resumoTentativas || "Nenhuma tentativa registrada."}
+
+=== ERROS POR MOTORISTA (perguntas específicas erradas) ===
+${resumoErros || "Nenhum dado de erros por pergunta ainda."}
+
+=== PERGUNTAS COM MAIS ERROS (top 10) ===
+${topErros || "Nenhum dado disponível ainda."}
+
+=== TOTAIS GERAIS ===
+Total de respostas por questão: ${respostasData.length}
+Total de erros: ${erros.length}
+Total de acertos: ${acertos.length}
+Taxa de acerto geral: ${respostasData.length > 0 ? ((acertos.length / respostasData.length) * 100).toFixed(1) : 0}%`;
 
       const res = await api("ai_chat", {
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 800,
+        max_tokens: 1000,
         system: contexto,
         messages: [{ role: "user", content: pergunta }],
         motorista: "adm_inteligencia"
@@ -311,7 +363,7 @@ ${resumoTentativas}`;
         ))}
       </div>
 
-      <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <div style={{ flex:1, overflowY:"auto", padding: aba === "inteligencia" ? 0 : 20, display:"flex", flexDirection:"column" }}>
 
         {/* MOTORISTAS */}
         {aba === "motoristas" && (
@@ -379,8 +431,6 @@ ${resumoTentativas}`;
               <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Quiz</div>
               <div style={{ fontSize:18, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
             </div>
-
-            {/* Motoristas que responderam */}
             <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>
               ✓ Responderam ({tentativas.length})
             </div>
@@ -400,8 +450,6 @@ ${resumoTentativas}`;
                 ))
               }
             </div>
-
-            {/* Motoristas que NÃO responderam */}
             {(() => {
               const responderam = new Set(tentativas.map(t => t.motorista_cpf));
               const pendentes = motoristasList.filter(m => !responderam.has(m.cpf));
@@ -455,7 +503,6 @@ ${resumoTentativas}`;
                 )}
               </div>
             </div>
-
             <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
               {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
                 regras.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhuma regra cadastrada.</div> :
@@ -473,9 +520,10 @@ ${resumoTentativas}`;
             </div>
           </div>
         )}
+
         {/* INTELIGÊNCIA IA */}
         {aba === "inteligencia" && (
-          <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+          <div style={{ flex:1, display:"flex", flexDirection:"column", height:"calc(100vh - 124px)" }}>
             <div style={{ flex:1, overflowY:"auto", padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
               {iMsgs.map((m, i) => (
                 <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", gap:8, alignItems:"flex-end" }}>
@@ -534,17 +582,35 @@ function QuizDinamico({ quiz, usuario, onFim, onVoltar }) {
     });
   }, [quiz.id]);
 
-  const answer = (letra) => {
+  // ── PATCH 2: salvar cada resposta individualmente em quiz_respostas ──
+  const answer = async (letra) => {
     if (qsel) return;
+    const q = questoes[qi];
     setQsel(letra);
     setQshow(true);
-    if (letra === questoes[qi].correta) setScore(s => s + 1);
+    const acertou = letra === q.correta;
+    if (acertou) setScore(s => s + 1);
+
+    // Salva a resposta desta questão no banco
+    try {
+      await sb.post("quiz_respostas", {
+        motorista_nome: usuario.nome,
+        quiz_titulo:    quiz.titulo,
+        questao_id:     q.id || null,
+        pergunta:       q.pergunta,
+        resposta_dada:  letra,
+        correta:        q.correta,
+        acertou:        acertou,
+      });
+    } catch {
+      // Não bloqueia o quiz se o save falhar
+    }
   };
 
   const next = async () => {
     if (qi + 1 >= questoes.length) {
-      const pct = ((score + (qsel === questoes[qi].correta ? 1 : 0)) / questoes.length) * 100;
       const finalScore = score + (qsel === questoes[qi].correta ? 1 : 0);
+      const pct = (finalScore / questoes.length) * 100;
       await sb.post("quiz_tentativas", {
         quiz_id: quiz.id,
         motorista_cpf: usuario.cpf,
@@ -692,7 +758,6 @@ function ListaQuizzes({ usuario, onIniciar }) {
           </div>
         </>
       )}
-
       {feitos.length > 0 && (
         <>
           <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>
@@ -702,7 +767,6 @@ function ListaQuizzes({ usuario, onIniciar }) {
             {feitos.map((q, i) => {
               const ts = tentativasPorQuiz[q.id];
               const melhor = Math.max(...ts.map(t => t.percentual));
-              const ultima = ts[0];
               return (
                 <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<feitos.length-1?`1px solid ${C.BORDER}`:"none" }}>
                   <div style={{ flex:1 }}>
@@ -721,7 +785,6 @@ function ListaQuizzes({ usuario, onIniciar }) {
           </div>
         </>
       )}
-
       {quizzes.length === 0 && (
         <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center", color:C.MUTED, fontSize:13 }}>
           Nenhum quiz disponível ainda. Aguarde o gestor adicionar novas regras.
@@ -814,8 +877,6 @@ export default function App() {
     if ((!input.trim() && !imagemBase64) || loading) return;
     const txt = input.trim() || "O que você vê nessa imagem? Me ajude com isso.";
     setInput("");
-
-    // Monta conteúdo da mensagem (com ou sem imagem)
     let userContent;
     if (imagemBase64) {
       userContent = [
@@ -825,17 +886,12 @@ export default function App() {
     } else {
       userContent = txt;
     }
-
     const preview = imagemPreview;
     limparFoto();
-
-    const newMsgs = [...msgs, { role:"user", content: userContent }];
-    // Para exibir na tela, guarda versão simplificada
     const msgDisplay = { role:"user", content: txt, imagem: preview };
     setMsgs(p => [...p, msgDisplay]);
     setLoading(true);
     try {
-      // Para a API, usa as msgs com o conteúdo correto
       const msgsParaApi = [...msgs.map(m => ({
         role: m.role,
         content: Array.isArray(m.content) ? m.content : m.content
@@ -912,7 +968,6 @@ export default function App() {
       </div>
 
       <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column" }}>
-
         {/* CHAT */}
         {tab === "chat" && (
           <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
@@ -921,9 +976,7 @@ export default function App() {
                 <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", gap:10, alignItems:"flex-end" }}>
                   {m.role==="assistant" && <div style={{ width:32, height:32, borderRadius:2, background:C.RED, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.WHITE, flexShrink:0 }}>BEN</div>}
                   <div style={{ maxWidth:"78%", borderRadius:m.role==="user"?"10px 10px 2px 10px":"10px 10px 10px 2px", overflow:"hidden" }}>
-                    {m.imagem && (
-                      <img src={m.imagem} alt="foto enviada" style={{ width:"100%", maxWidth:220, display:"block", borderRadius:"10px 10px 2px 2px" }} />
-                    )}
+                    {m.imagem && <img src={m.imagem} alt="foto" style={{ width:"100%", maxWidth:220, display:"block", borderRadius:"10px 10px 2px 2px" }} />}
                     <div style={{ padding:"10px 14px", background:m.role==="user"?C.RED:C.CARD, border:m.role==="assistant"?`1px solid ${C.BORDER}`:"none", fontSize:14, color:C.TEXT }}>
                       {fmt(typeof m.content === "string" ? m.content : m.content?.[1]?.text || m.content?.[0]?.text || "")}
                     </div>
@@ -945,7 +998,6 @@ export default function App() {
                 <button key={q} onClick={() => setInput(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, fontSize:10, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, letterSpacing:0.8, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>{q}</button>
               ))}
             </div>
-            {/* Preview da imagem selecionada */}
             {imagemPreview && (
               <div style={{ padding:"8px 16px 0", background:C.NAV, display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
                 <img src={imagemPreview} alt="preview" style={{ width:52, height:52, objectFit:"cover", borderRadius:4, border:`1px solid ${C.BORDER2}` }} />
@@ -954,15 +1006,10 @@ export default function App() {
               </div>
             )}
             <div style={{ padding:"10px 16px 12px", borderTop:`1px solid ${C.BORDER}`, display:"flex", gap:8, background:C.NAV, flexShrink:0 }}>
-              {/* Input de arquivo oculto */}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFoto} style={{ display:"none" }} />
               <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder={ouvindo?"Ouvindo... fale agora":imagemBase64?"Descreva sua dúvida sobre a foto...":"Digite ou use o microfone..."}
                 style={{ flex:1, background:C.CARD, border:`1px solid ${ouvindo?C.RED:imagemBase64?"#f39c12":C.BORDER2}`, borderRadius:2, padding:"11px 14px", color:C.TEXT, fontSize:13, outline:"none", fontFamily:"inherit", transition:"border 0.2s" }} />
-              {/* Botão câmera */}
-              <button onClick={() => fileInputRef.current?.click()} title="Enviar foto" style={{ background:imagemBase64?"rgba(243,156,18,0.15)":"rgba(192,57,43,0.15)", border:`1px solid ${imagemBase64?"#f39c12":C.BORDER2}`, borderRadius:2, width:46, cursor:"pointer", color:imagemBase64?"#f39c12":C.MUTED, fontSize:18, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                📷
-              </button>
-              {/* Botão microfone */}
+              <button onClick={() => fileInputRef.current?.click()} style={{ background:imagemBase64?"rgba(243,156,18,0.15)":"rgba(192,57,43,0.15)", border:`1px solid ${imagemBase64?"#f39c12":C.BORDER2}`, borderRadius:2, width:46, cursor:"pointer", color:imagemBase64?"#f39c12":C.MUTED, fontSize:18, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>📷</button>
               <button onClick={toggleMic} style={{ background:ouvindo?C.RED:"rgba(192,57,43,0.15)", border:`1px solid ${ouvindo?C.RED:C.BORDER2}`, borderRadius:2, width:46, cursor:"pointer", color:ouvindo?C.WHITE:C.MUTED, fontSize:18, display:"flex", alignItems:"center", justifyContent:"center", animation:ouvindo?"micPulse 1s infinite":"none", flexShrink:0 }}>
                 {ouvindo?"⏹":"🎤"}
               </button>
@@ -1002,7 +1049,6 @@ export default function App() {
         {/* QUIZ */}
         {tab === "quiz" && !quizAtivo && <ListaQuizzes usuario={usuario} onIniciar={setQuizAtivo} />}
         {tab === "quiz" && quizAtivo && <QuizDinamico quiz={quizAtivo} usuario={usuario} onFim={() => setQuizAtivo(null)} onVoltar={() => setQuizAtivo(null)} />}
-
       </div>
 
       <style>{`
