@@ -645,6 +645,9 @@ export default function App() {
   const [ouvindo, setOuvindo] = useState(false);
   const [semMic, setSemMic] = useState(false);
   const recognitionRef = useRef(null);
+  const [imagemBase64, setImagemBase64] = useState(null);
+  const [imagemPreview, setImagemPreview] = useState(null);
+  const fileInputRef = useRef(null);
   const [step, setStep] = useState(0);
   const [quizAtivo, setQuizAtivo] = useState(null);
   const [quizzesCount, setQuizzesCount] = useState(0);
@@ -687,15 +690,56 @@ export default function App() {
     return base;
   };
 
+  const handleFoto = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result.split(",")[1];
+      const mediaType = file.type || "image/jpeg";
+      setImagemBase64({ data: base64, mediaType });
+      setImagemPreview(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const limparFoto = () => {
+    setImagemBase64(null);
+    setImagemPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const send = async () => {
-    if (!input.trim() || loading) return;
-    const txt = input.trim();
+    if ((!input.trim() && !imagemBase64) || loading) return;
+    const txt = input.trim() || "O que você vê nessa imagem? Me ajude com isso.";
     setInput("");
-    const newMsgs = [...msgs, { role:"user", content:txt }];
-    setMsgs(newMsgs);
+
+    // Monta conteúdo da mensagem (com ou sem imagem)
+    let userContent;
+    if (imagemBase64) {
+      userContent = [
+        { type: "image", source: { type: "base64", media_type: imagemBase64.mediaType, data: imagemBase64.data } },
+        { type: "text", text: txt }
+      ];
+    } else {
+      userContent = txt;
+    }
+
+    const preview = imagemPreview;
+    limparFoto();
+
+    const newMsgs = [...msgs, { role:"user", content: userContent }];
+    // Para exibir na tela, guarda versão simplificada
+    const msgDisplay = { role:"user", content: txt, imagem: preview };
+    setMsgs(p => [...p, msgDisplay]);
     setLoading(true);
     try {
-      const res = await api("ai_chat", { model:"claude-haiku-4-5-20251001", max_tokens:1000, system:buildKnowledge(), messages:newMsgs, motorista:usuario.cpf });
+      // Para a API, usa as msgs com o conteúdo correto
+      const msgsParaApi = [...msgs.map(m => ({
+        role: m.role,
+        content: Array.isArray(m.content) ? m.content : m.content
+      })), { role:"user", content: userContent }];
+      const res = await api("ai_chat", { model:"claude-haiku-4-5-20251001", max_tokens:1000, system:buildKnowledge(), messages:msgsParaApi, motorista:usuario.cpf });
       const reply = res.content?.[0]?.text || "Não foi possível processar. Tente novamente.";
       setMsgs(p => [...p, { role:"assistant", content:reply }]);
     } catch { setMsgs(p => [...p, { role:"assistant", content:"Erro de conexão. Tente novamente." }]); }
@@ -775,8 +819,13 @@ export default function App() {
               {msgs.map((m, i) => (
                 <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", gap:10, alignItems:"flex-end" }}>
                   {m.role==="assistant" && <div style={{ width:32, height:32, borderRadius:2, background:C.RED, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.WHITE, flexShrink:0 }}>BEN</div>}
-                  <div style={{ maxWidth:"78%", padding:"10px 14px", borderRadius:m.role==="user"?"10px 10px 2px 10px":"10px 10px 10px 2px", background:m.role==="user"?C.RED:C.CARD, border:m.role==="assistant"?`1px solid ${C.BORDER}`:"none", fontSize:14, color:C.TEXT }}>
-                    {fmt(m.content)}
+                  <div style={{ maxWidth:"78%", borderRadius:m.role==="user"?"10px 10px 2px 10px":"10px 10px 10px 2px", overflow:"hidden" }}>
+                    {m.imagem && (
+                      <img src={m.imagem} alt="foto enviada" style={{ width:"100%", maxWidth:220, display:"block", borderRadius:"10px 10px 2px 2px" }} />
+                    )}
+                    <div style={{ padding:"10px 14px", background:m.role==="user"?C.RED:C.CARD, border:m.role==="assistant"?`1px solid ${C.BORDER}`:"none", fontSize:14, color:C.TEXT }}>
+                      {fmt(typeof m.content === "string" ? m.content : m.content?.[1]?.text || m.content?.[0]?.text || "")}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -795,13 +844,28 @@ export default function App() {
                 <button key={q} onClick={() => setInput(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, fontSize:10, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, letterSpacing:0.8, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>{q}</button>
               ))}
             </div>
+            {/* Preview da imagem selecionada */}
+            {imagemPreview && (
+              <div style={{ padding:"8px 16px 0", background:C.NAV, display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+                <img src={imagemPreview} alt="preview" style={{ width:52, height:52, objectFit:"cover", borderRadius:4, border:`1px solid ${C.BORDER2}` }} />
+                <div style={{ fontSize:11, color:C.MUTED, flex:1 }}>Imagem pronta para enviar</div>
+                <button onClick={limparFoto} style={{ background:"none", border:"none", color:C.RED, cursor:"pointer", fontSize:16, padding:4 }}>✕</button>
+              </div>
+            )}
             <div style={{ padding:"10px 16px 12px", borderTop:`1px solid ${C.BORDER}`, display:"flex", gap:8, background:C.NAV, flexShrink:0 }}>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder={ouvindo?"Ouvindo... fale agora":"Digite ou use o microfone..."}
-                style={{ flex:1, background:C.CARD, border:`1px solid ${ouvindo?C.RED:C.BORDER2}`, borderRadius:2, padding:"11px 14px", color:C.TEXT, fontSize:13, outline:"none", fontFamily:"inherit", transition:"border 0.2s" }} />
+              {/* Input de arquivo oculto */}
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFoto} style={{ display:"none" }} />
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder={ouvindo?"Ouvindo... fale agora":imagemBase64?"Descreva sua dúvida sobre a foto...":"Digite ou use o microfone..."}
+                style={{ flex:1, background:C.CARD, border:`1px solid ${ouvindo?C.RED:imagemBase64?"#f39c12":C.BORDER2}`, borderRadius:2, padding:"11px 14px", color:C.TEXT, fontSize:13, outline:"none", fontFamily:"inherit", transition:"border 0.2s" }} />
+              {/* Botão câmera */}
+              <button onClick={() => fileInputRef.current?.click()} title="Enviar foto" style={{ background:imagemBase64?"rgba(243,156,18,0.15)":"rgba(192,57,43,0.15)", border:`1px solid ${imagemBase64?"#f39c12":C.BORDER2}`, borderRadius:2, width:46, cursor:"pointer", color:imagemBase64?"#f39c12":C.MUTED, fontSize:18, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                📷
+              </button>
+              {/* Botão microfone */}
               <button onClick={toggleMic} style={{ background:ouvindo?C.RED:"rgba(192,57,43,0.15)", border:`1px solid ${ouvindo?C.RED:C.BORDER2}`, borderRadius:2, width:46, cursor:"pointer", color:ouvindo?C.WHITE:C.MUTED, fontSize:18, display:"flex", alignItems:"center", justifyContent:"center", animation:ouvindo?"micPulse 1s infinite":"none", flexShrink:0 }}>
                 {ouvindo?"⏹":"🎤"}
               </button>
-              <button onClick={send} disabled={loading||!input.trim()} style={{ background:(!loading&&input.trim())?C.RED:C.CARD2, border:"none", borderRadius:2, width:46, cursor:(!loading&&input.trim())?"pointer":"not-allowed", color:(!loading&&input.trim())?C.WHITE:C.MUTED2, fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, flexShrink:0 }}>›</button>
+              <button onClick={send} disabled={loading||(!input.trim()&&!imagemBase64)} style={{ background:(!loading&&(input.trim()||imagemBase64))?C.RED:C.CARD2, border:"none", borderRadius:2, width:46, cursor:(!loading&&(input.trim()||imagemBase64))?"pointer":"not-allowed", color:(!loading&&(input.trim()||imagemBase64))?C.WHITE:C.MUTED2, fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, flexShrink:0 }}>›</button>
             </div>
             {semMic && <div style={{ padding:"6px 16px 10px", fontSize:11, color:C.RED, background:C.NAV }}>⚠️ Microfone não suportado. Use Chrome ou Edge.</div>}
           </div>
