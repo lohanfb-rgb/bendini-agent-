@@ -141,8 +141,13 @@ function PainelAdm({ onSair }) {
   const [gerando, setGerando] = useState(false);
   const [msg, setMsg] = useState("");
   const [quizDetalhe, setQuizDetalhe] = useState(null);
+  const [quizView, setQuizView] = useState("respostas"); // "respostas" | "questoes"
   const [tentativas, setTentativas] = useState([]);
   const [motoristasList, setMotoristasList] = useState([]);
+  const [questoes, setQuestoes] = useState([]);
+  const [editandoQuestao, setEditandoQuestao] = useState(null); // null | questao obj
+  const [novaQuestao, setNovaQuestao] = useState({ pergunta:"", opcao_a:"", opcao_b:"", opcao_c:"", opcao_d:"", correta:"a", explicacao:"" });
+  const [addingQuestao, setAddingQuestao] = useState(false);
   const [iMsgs, setIMsgs] = useState([{ role:"assistant", content:"Olá! Sou seu assistente de inteligência. Pode me perguntar sobre motoristas, quizzes e resultados.\n\nExemplos:\n— Quais motoristas não responderam o quiz de velocidades?\n— Qual a média geral dos quizzes?\n— Quem tirou menos de 60%?\n— Quais perguntas o motorista X errou?" }]);
   const [iInput, setIInput] = useState("");
   const [iLoading, setILoading] = useState(false);
@@ -220,8 +225,53 @@ function PainelAdm({ onSair }) {
 
   const verDetalheQuiz = async (quiz) => {
     setQuizDetalhe(quiz);
-    const t = await sb.get("quiz_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`);
+    setQuizView("respostas");
+    setEditandoQuestao(null);
+    setAddingQuestao(false);
+    const [t, q] = await Promise.all([
+      sb.get("quiz_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`),
+      sb.get("quiz_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`),
+    ]);
     setTentativas(Array.isArray(t) ? t : []);
+    setQuestoes(Array.isArray(q) ? q : []);
+  };
+
+  const salvarQuestao = async () => {
+    const dados = editandoQuestao || novaQuestao;
+    if (!dados.pergunta.trim()) { showMsg("Digite a pergunta.", C.RED); return; }
+    try {
+      if (editandoQuestao) {
+        await sb.patch("quiz_questoes", `id=eq.${editandoQuestao.id}`, {
+          pergunta: editandoQuestao.pergunta, opcao_a: editandoQuestao.opcao_a,
+          opcao_b: editandoQuestao.opcao_b, opcao_c: editandoQuestao.opcao_c,
+          opcao_d: editandoQuestao.opcao_d, correta: editandoQuestao.correta,
+          explicacao: editandoQuestao.explicacao,
+        });
+        showMsg("Questão atualizada!");
+        setEditandoQuestao(null);
+      } else {
+        await sb.post("quiz_questoes", {
+          quiz_id: quizDetalhe.id, pergunta: novaQuestao.pergunta,
+          opcao_a: novaQuestao.opcao_a, opcao_b: novaQuestao.opcao_b,
+          opcao_c: novaQuestao.opcao_c, opcao_d: novaQuestao.opcao_d,
+          correta: novaQuestao.correta, explicacao: novaQuestao.explicacao,
+          ordem: questoes.length + 1,
+        });
+        showMsg("Questão adicionada!");
+        setNovaQuestao({ pergunta:"", opcao_a:"", opcao_b:"", opcao_c:"", opcao_d:"", correta:"a", explicacao:"" });
+        setAddingQuestao(false);
+      }
+      const q2 = await sb.get("quiz_questoes", `quiz_id=eq.${quizDetalhe.id}&order=ordem.asc`);
+      setQuestoes(Array.isArray(q2) ? q2 : []);
+    } catch { showMsg("Erro ao salvar questão.", C.RED); }
+  };
+
+  const excluirQuestao = async (id) => {
+    if (!window.confirm("Excluir esta questão?")) return;
+    await sb.delete("quiz_questoes", `id=eq.${id}`);
+    showMsg("Questão excluída.");
+    const q = await sb.get("quiz_questoes", `quiz_id=eq.${quizDetalhe.id}&order=ordem.asc`);
+    setQuestoes(Array.isArray(q) ? q : []);
   };
 
   const ABAS = [
@@ -426,55 +476,145 @@ Taxa de acerto geral: ${respostasData.length > 0 ? ((acertos.length / respostasD
         {/* DETALHE QUIZ */}
         {aba === "quizzes" && quizDetalhe && (
           <div>
-            <button onClick={() => setQuizDetalhe(null)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
-            <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"16px 20px", marginBottom:16 }}>
-              <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Quiz</div>
-              <div style={{ fontSize:18, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
+            {/* Header */}
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+              <button onClick={() => { setQuizDetalhe(null); setEditandoQuestao(null); setAddingQuestao(false); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+              <div style={{ flex:1, fontSize:16, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
             </div>
-            <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>
-              ✓ Responderam ({tentativas.length})
+
+            {/* Sub-abas */}
+            <div style={{ display:"flex", gap:0, marginBottom:20, background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+              {[{id:"respostas",label:`📊 Respostas (${tentativas.length})`},{id:"questoes",label:`✏️ Questões (${questoes.length})`}].map(v => (
+                <button key={v.id} onClick={() => { setQuizView(v.id); setEditandoQuestao(null); setAddingQuestao(false); }}
+                  style={{ flex:1, padding:"11px 8px", background:quizView===v.id?C.CARD:"none", border:"none", borderBottom:quizView===v.id?`2px solid ${C.RED}`:"2px solid transparent", color:quizView===v.id?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>
+                  {v.label}
+                </button>
+              ))}
             </div>
-            <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
-              {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum motorista respondeu ainda.</div> :
-                tentativas.map((t, i) => (
-                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.motorista_nome}</div>
-                      <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.motorista_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")} {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" })}</div>
-                    </div>
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
-                      <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-            {(() => {
-              const responderam = new Set(tentativas.map(t => t.motorista_cpf));
-              const pendentes = motoristasList.filter(m => !responderam.has(m.cpf));
-              return (
-                <>
-                  <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>
-                    ✗ Pendentes ({pendentes.length})
-                  </div>
-                  <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
-                    {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos os motoristas responderam!</div> :
-                      pendentes.map((m, i) => (
-                        <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                          <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{m.nome}</div>
-                            <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
-                          </div>
-                          <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+
+            {/* ABA: RESPOSTAS */}
+            {quizView === "respostas" && (
+              <div>
+                <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✓ Responderam ({tentativas.length})</div>
+                <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
+                  {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum motorista respondeu ainda.</div> :
+                    tentativas.map((t, i) => (
+                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.motorista_nome}</div>
+                          <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.motorista_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")} {new Date(t.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
                         </div>
-                      ))
-                    }
-                  </div>
-                </>
-              );
-            })()}
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
+                          <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+                {(() => {
+                  const responderam = new Set(tentativas.map(t => t.motorista_cpf));
+                  const pendentes = motoristasList.filter(m => !responderam.has(m.cpf));
+                  return (
+                    <>
+                      <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✗ Pendentes ({pendentes.length})</div>
+                      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+                        {pendentes.length === 0
+                          ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos responderam!</div>
+                          : pendentes.map((m, i) => (
+                            <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                              <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
+                              <div style={{ flex:1 }}>
+                                <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{m.nome}</div>
+                                <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
+                              </div>
+                              <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* ABA: QUESTÕES */}
+            {quizView === "questoes" && (
+              <div>
+                {/* Formulário editar/adicionar */}
+                {(editandoQuestao || addingQuestao) && (() => {
+                  const q = editandoQuestao || novaQuestao;
+                  const setQ = editandoQuestao
+                    ? (field, val) => setEditandoQuestao(p => ({...p, [field]:val}))
+                    : (field, val) => setNovaQuestao(p => ({...p, [field]:val}));
+                  return (
+                    <div style={{ background:C.CARD, border:`2px solid ${C.RED}`, borderRadius:2, padding:20, marginBottom:20 }}>
+                      <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
+                        {editandoQuestao ? "✏️ Editar Questão" : "➕ Nova Questão"}
+                      </div>
+                      <textarea value={q.pergunta} onChange={e => setQ("pergunta", e.target.value)} placeholder="Texto da pergunta..." rows={2}
+                        style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:10, resize:"vertical", lineHeight:1.5 }} />
+                      {["a","b","c","d"].map(l => (
+                        <div key={l} style={{ display:"flex", gap:8, alignItems:"center", marginBottom:8 }}>
+                          <div style={{ width:24, height:24, borderRadius:2, background:q.correta===l?C.RED:C.BORDER2, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.WHITE, flexShrink:0, cursor:"pointer" }}
+                            onClick={() => setQ("correta", l)}>{l.toUpperCase()}</div>
+                          <input value={q[`opcao_${l}`]} onChange={e => setQ(`opcao_${l}`, e.target.value)} placeholder={`Opção ${l.toUpperCase()}`}
+                            style={{ flex:1, background:q.correta===l?"rgba(192,57,43,0.08)":C.NAV, border:`1px solid ${q.correta===l?C.RED:C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit" }} />
+                          {q.correta===l && <span style={{ fontSize:9, color:C.RED, fontWeight:900, letterSpacing:1 }}>✓ CORRETA</span>}
+                        </div>
+                      ))}
+                      <textarea value={q.explicacao} onChange={e => setQ("explicacao", e.target.value)} placeholder="Explicação da resposta correta (opcional)..." rows={2}
+                        style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginTop:4, marginBottom:14, resize:"vertical", lineHeight:1.5 }} />
+                      <div style={{ fontSize:11, color:C.MUTED, marginBottom:12 }}>Clique na letra para definir a resposta correta.</div>
+                      <div style={{ display:"flex", gap:8 }}>
+                        <button onClick={salvarQuestao} style={{ background:C.RED, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                          {editandoQuestao ? "Salvar Alteração" : "Adicionar Questão"}
+                        </button>
+                        <button onClick={() => { setEditandoQuestao(null); setAddingQuestao(false); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Botão adicionar */}
+                {!editandoQuestao && !addingQuestao && (
+                  <button onClick={() => setAddingQuestao(true)} style={{ background:"none", border:`1px dashed ${C.RED}`, borderRadius:2, padding:"10px 20px", color:C.RED, cursor:"pointer", fontSize:10, letterSpacing:2, fontWeight:800, textTransform:"uppercase", fontFamily:"inherit", width:"100%", marginBottom:16 }}>
+                    + Adicionar Nova Questão
+                  </button>
+                )}
+
+                {/* Lista de questões */}
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {questoes.length === 0
+                    ? <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, color:C.MUTED, fontSize:13 }}>Nenhuma questão cadastrada.</div>
+                    : questoes.map((q, i) => (
+                      <div key={q.id} style={{ background:editandoQuestao?.id===q.id?C.CARD2:C.CARD, border:`1px solid ${editandoQuestao?.id===q.id?C.RED:C.BORDER}`, borderRadius:2, padding:"14px 16px" }}>
+                        <div style={{ display:"flex", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                          <div style={{ fontSize:10, color:C.MUTED, fontWeight:800, letterSpacing:1, minWidth:22, paddingTop:2 }}>#{i+1}</div>
+                          <div style={{ flex:1, fontSize:14, fontWeight:700, color:C.WHITE, lineHeight:1.5 }}>{q.pergunta}</div>
+                          <button onClick={() => { setEditandoQuestao({...q}); setAddingQuestao(false); window.scrollTo(0,0); }}
+                            style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"3px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit", flexShrink:0 }}>Editar</button>
+                          <button onClick={() => excluirQuestao(q.id)}
+                            style={{ background:"none", border:`1px solid rgba(192,57,43,0.4)`, borderRadius:2, padding:"3px 10px", color:C.RED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit", flexShrink:0 }}>Excluir</button>
+                        </div>
+                        <div style={{ display:"flex", flexWrap:"wrap", gap:6, paddingLeft:32 }}>
+                          {["a","b","c","d"].map(l => (
+                            <div key={l} style={{ padding:"4px 10px", borderRadius:2, background:q.correta===l?"rgba(46,204,113,0.1)":C.NAV, border:`1px solid ${q.correta===l?"#2ecc71":C.BORDER}`, fontSize:12, color:q.correta===l?"#2ecc71":C.MUTED, display:"flex", gap:6, alignItems:"center" }}>
+                              <span style={{ fontWeight:900, fontSize:10 }}>{l.toUpperCase()}.</span> {q[`opcao_${l}`] || "—"}
+                              {q.correta===l && <span style={{ fontSize:9, fontWeight:900 }}>✓</span>}
+                            </div>
+                          ))}
+                        </div>
+                        {q.explicacao && (
+                          <div style={{ marginTop:8, paddingLeft:32, fontSize:12, color:C.MUTED, fontStyle:"italic", lineHeight:1.5 }}>💡 {q.explicacao}</div>
+                        )}
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
           </div>
         )}
 
