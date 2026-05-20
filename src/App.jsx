@@ -733,7 +733,7 @@ function QuizDinamico({ quiz, usuario, onFim, onVoltar }) {
 
     // Salva a resposta desta questão no banco
     try {
-      await sb.post("quiz_respostas", {
+      const payload = {
         motorista_nome: usuario.nome,
         quiz_titulo:    quiz.titulo,
         questao_id:     q.id || null,
@@ -741,9 +741,12 @@ function QuizDinamico({ quiz, usuario, onFim, onVoltar }) {
         resposta_dada:  letra,
         correta:        q.correta,
         acertou:        acertou,
-      });
-    } catch {
-      // Não bloqueia o quiz se o save falhar
+      };
+      console.log("📤 Enviando para quiz_respostas:", payload);
+      const resultado = await sb.post("quiz_respostas", payload);
+      console.log("✅ Resposta do servidor:", JSON.stringify(resultado));
+    } catch (err) {
+      console.error("❌ Erro ao salvar quiz_respostas:", err);
     }
   };
 
