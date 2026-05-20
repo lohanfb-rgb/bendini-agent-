@@ -143,6 +143,10 @@ function PainelAdm({ onSair }) {
   const [quizDetalhe, setQuizDetalhe] = useState(null);
   const [tentativas, setTentativas] = useState([]);
   const [motoristasList, setMotoristasList] = useState([]);
+  const [iMsgs, setIMsgs] = useState([{ role:"assistant", content:"Olá! Sou seu assistente de inteligência. Pode me perguntar sobre motoristas, quizzes e resultados.\n\nExemplos:\n— Quais motoristas não responderam o quiz de velocidades?\n— Qual a média geral dos quizzes?\n— Quem tirou menos de 60%?" }]);
+  const [iInput, setIInput] = useState("");
+  const [iLoading, setILoading] = useState(false);
+  const iEndRef = useRef(null);
 
   const showMsg = (m, cor = C.GREEN) => { setMsg({ text: m, cor }); setTimeout(() => setMsg(""), 4000); };
 
@@ -220,10 +224,71 @@ function PainelAdm({ onSair }) {
   };
 
   const ABAS = [
-    { id:"motoristas", label:"Motoristas" },
-    { id:"quizzes",    label:"Quizzes" },
-    { id:"regras",     label:"Regras" },
+    { id:"motoristas",   label:"Motoristas" },
+    { id:"quizzes",      label:"Quizzes" },
+    { id:"regras",       label:"Regras" },
+    { id:"inteligencia", label:"Inteligência IA" },
   ];
+
+  const sendInteligencia = async () => {
+    if (!iInput.trim() || iLoading) return;
+    const pergunta = iInput.trim();
+    setIInput("");
+    setIMsgs(p => [...p, { role:"user", content: pergunta }]);
+    setILoading(true);
+    try {
+      // Busca dados do banco para contextualizar a IA
+      const [mots, quizList, tentList] = await Promise.all([
+        sb.get("motoristas", "order=nome.asc"),
+        sb.get("quizzes", "order=titulo.asc"),
+        sb.get("quiz_tentativas", "order=created_at.desc&limit=500"),
+      ]);
+
+      const motoristasData = Array.isArray(mots) ? mots : [];
+      const quizzesData = Array.isArray(quizList) ? quizList : [];
+      const tentativasData = Array.isArray(tentList) ? tentList : [];
+
+      // Monta resumo dos dados para a IA
+      const resumoMotoristas = motoristasData.map(m => `${m.nome} (CPF: ${m.cpf}, ${m.ativo ? "ativo" : "inativo"})`).join("\n");
+
+      const resumoQuizzes = quizzesData.map(q => {
+        const tents = tentativasData.filter(t => t.quiz_id === q.id);
+        const responderam = [...new Set(tents.map(t => t.motorista_cpf))];
+        const ativos = motoristasData.filter(m => m.ativo);
+        const naoResponderam = ativos.filter(m => !responderam.includes(m.cpf));
+        const media = tents.length > 0 ? (tents.reduce((s, t) => s + Number(t.percentual), 0) / tents.length).toFixed(1) : "0";
+        return `Quiz: ${q.titulo}\n  Responderam: ${responderam.length} motoristas | Média: ${media}%\n  Pendentes: ${naoResponderam.map(m => m.nome).join(", ") || "nenhum"}`;
+      }).join("\n\n");
+
+      const resumoTentativas = tentativasData.slice(0, 100).map(t =>
+        `${t.motorista_nome} | Quiz: ${quizzesData.find(q => q.id === t.quiz_id)?.titulo || t.quiz_id} | Nota: ${Number(t.percentual).toFixed(0)}% (${t.score}/${t.total}) | Data: ${new Date(t.created_at).toLocaleDateString("pt-BR")}`
+      ).join("\n");
+
+      const contexto = `Você é um assistente de BI para o painel ADM da Bendini Logística. Responda perguntas sobre motoristas, quizzes e resultados com base nos dados abaixo. Seja direto e objetivo. Use listas quando necessário.
+
+=== MOTORISTAS CADASTRADOS ===
+${resumoMotoristas}
+
+=== SITUAÇÃO DOS QUIZZES ===
+${resumoQuizzes}
+
+=== ÚLTIMAS TENTATIVAS (últimas 100) ===
+${resumoTentativas}`;
+
+      const res = await api("ai_chat", {
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 800,
+        system: contexto,
+        messages: [{ role: "user", content: pergunta }],
+        motorista: "adm_inteligencia"
+      });
+      const reply = res.content?.[0]?.text || "Não foi possível processar.";
+      setIMsgs(p => [...p, { role:"assistant", content: reply }]);
+    } catch {
+      setIMsgs(p => [...p, { role:"assistant", content: "Erro de conexão. Tente novamente." }]);
+    }
+    setILoading(false);
+  };
 
   return (
     <div style={{ minHeight:"100vh", background:C.BG, fontFamily:"'Barlow','Segoe UI',sans-serif", color:C.TEXT, display:"flex", flexDirection:"column" }}>
@@ -408,8 +473,44 @@ function PainelAdm({ onSair }) {
             </div>
           </div>
         )}
+        {/* INTELIGÊNCIA IA */}
+        {aba === "inteligencia" && (
+          <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+            <div style={{ flex:1, overflowY:"auto", padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
+              {iMsgs.map((m, i) => (
+                <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", gap:8, alignItems:"flex-end" }}>
+                  {m.role==="assistant" && (
+                    <div style={{ width:30, height:30, borderRadius:2, background:C.RED, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:900, color:C.WHITE, flexShrink:0, letterSpacing:0.5 }}>ADM</div>
+                  )}
+                  <div style={{ maxWidth:"80%", padding:"10px 14px", borderRadius:m.role==="user"?"10px 10px 2px 10px":"10px 10px 10px 2px", background:m.role==="user"?C.RED:C.CARD, border:m.role==="assistant"?`1px solid ${C.BORDER}`:"none", fontSize:13, color:C.TEXT, whiteSpace:"pre-line", lineHeight:1.65 }}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {iLoading && (
+                <div style={{ display:"flex", alignItems:"flex-end", gap:8 }}>
+                  <div style={{ width:30, height:30, borderRadius:2, background:C.RED, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:900, color:C.WHITE }}>ADM</div>
+                  <div style={{ padding:"10px 14px", background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:"10px 10px 10px 2px", display:"flex", gap:4 }}>
+                    {[0,1,2].map(j => <div key={j} style={{ width:5, height:5, borderRadius:"50%", background:C.RED, animation:`bpulse 1s ${j*0.22}s infinite` }} />)}
+                  </div>
+                </div>
+              )}
+              <div ref={iEndRef} />
+            </div>
+            <div style={{ padding:"6px 14px 8px", display:"flex", gap:6, overflowX:"auto", flexShrink:0, background:C.NAV, borderTop:`1px solid ${C.BORDER}` }}>
+              {["Quem não respondeu algum quiz?","Qual a média geral dos quizzes?","Quem tirou menos de 60%?","Quantos motoristas ativos?"].map(q => (
+                <button key={q} onClick={() => setIInput(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 10px", color:C.MUTED, fontSize:10, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>{q}</button>
+              ))}
+            </div>
+            <div style={{ padding:"10px 14px 12px", borderTop:`1px solid ${C.BORDER}`, display:"flex", gap:8, background:C.NAV, flexShrink:0 }}>
+              <input value={iInput} onChange={e => setIInput(e.target.value)} onKeyDown={e => e.key==="Enter" && sendInteligencia()} placeholder="Pergunte sobre motoristas, quizzes e resultados..."
+                style={{ flex:1, background:C.CARD, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 14px", color:C.TEXT, fontSize:13, outline:"none", fontFamily:"inherit" }} />
+              <button onClick={sendInteligencia} disabled={iLoading||!iInput.trim()} style={{ background:(!iLoading&&iInput.trim())?C.RED:C.CARD2, border:"none", borderRadius:2, width:44, cursor:(!iLoading&&iInput.trim())?"pointer":"not-allowed", color:(!iLoading&&iInput.trim())?C.WHITE:C.MUTED2, fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900 }}>›</button>
+            </div>
+          </div>
+        )}
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:${C.NAV}}::-webkit-scrollbar-thumb{background:${C.BORDER2};border-radius:2px}input::placeholder,textarea::placeholder{color:${C.MUTED2}}button:focus{outline:none}`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:${C.NAV}}::-webkit-scrollbar-thumb{background:${C.BORDER2};border-radius:2px}input::placeholder,textarea::placeholder{color:${C.MUTED2}}button:focus{outline:none}@keyframes bpulse{0%,80%,100%{transform:scale(0.5);opacity:0.3}40%{transform:scale(1);opacity:1}}`}</style>
     </div>
   );
 }
