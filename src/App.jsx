@@ -1656,7 +1656,11 @@ function QuizOficina({ quiz, usuario, onVoltar }) {
 
   useEffect(() => {
     sb.get("oficina_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`).then(d => {
+      console.log("oficina_questoes:", JSON.stringify(d));
       setQuestoes(Array.isArray(d) ? d : []);
+      setLoading(false);
+    }).catch(e => {
+      console.error("Erro ao carregar questoes oficina:", e);
       setLoading(false);
     });
   }, [quiz.id]);
@@ -1679,7 +1683,7 @@ function QuizOficina({ quiz, usuario, onVoltar }) {
 
   const next = async () => {
     if (qi + 1 >= questoes.length) {
-      const finalScore = score + (qsel === questoes[qi].correta ? 1 : 0);
+      const finalScore = score + (qsel === questoes[qi]?.correta ? 1 : 0);
       const pct = (finalScore / questoes.length) * 100;
       await sb.post("oficina_tentativas", {
         quiz_id: quiz.id, mecanico_cpf: usuario.cpf,
@@ -1697,6 +1701,18 @@ function QuizOficina({ quiz, usuario, onVoltar }) {
 
   if (loading) return <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}><div style={{ color:C.MUTED, fontSize:13 }}>Carregando questões...</div></div>;
 
+  // Proteção: sem questões carregadas
+  if (!questoes.length) return (
+    <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center", maxWidth:360 }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>⚠️</div>
+        <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:8 }}>Questões não encontradas</div>
+        <div style={{ fontSize:13, color:C.MUTED, marginBottom:20, lineHeight:1.6 }}>Este quiz ainda não tem questões cadastradas. Fale com o gestor.</div>
+        <button onClick={onVoltar} style={{ background:"#e67e22", border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", fontWeight:900 }}>← Voltar</button>
+      </div>
+    </div>
+  );
+
   if (done) return (
     <div style={{ flex:1, overflowY:"auto", padding:20 }}>
       <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center" }}>
@@ -1713,7 +1729,7 @@ function QuizOficina({ quiz, usuario, onVoltar }) {
     </div>
   );
 
-  const q = questoes[qi];
+  const q = questoes[qi] || {};
   return (
     <div style={{ flex:1, overflowY:"auto", padding:20 }}>
       <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
