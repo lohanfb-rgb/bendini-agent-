@@ -1893,6 +1893,7 @@ function PainelOficinaAdm({ showMsg }) {
     try {
       if (subAba === "mecanicos") {
         const d = await sb.get("mecanicos", "order=nome.asc");
+        console.log("mecanicos:", d);
         setMecanicos(Array.isArray(d) ? d : []);
       } else if (subAba === "quizzes") {
         const [q, m] = await Promise.all([
@@ -1905,17 +1906,33 @@ function PainelOficinaAdm({ showMsg }) {
         const d = await sb.get("oficina_regras", "order=ordem.asc");
         setRegras(Array.isArray(d) ? d : []);
       }
-    } catch {}
+    } catch (e) { console.error("carregarOficina erro:", e); }
     setLoading(false);
   };
 
   const adicionarMecanico = async () => {
     const c = cleanCPF(novoCpf);
     if (c.length !== 11 || !novoNome.trim()) { showMsg("Preencha CPF e nome.", C.RED); return; }
-    await sb.post("mecanicos", { cpf: c, nome: novoNome.trim() });
-    setNovoCpf(""); setNovoNome("");
-    showMsg("Mecânico cadastrado!");
-    carregarOficina();
+    try {
+      const resultado = await sb.post("mecanicos", { cpf: c, nome: novoNome.trim() });
+      console.log("POST mecanicos resultado:", JSON.stringify(resultado));
+      // Verifica se realmente salvou (Supabase retorna array com o item criado)
+      if (Array.isArray(resultado) && resultado.length > 0) {
+        setNovoCpf(""); setNovoNome("");
+        showMsg("Mecânico cadastrado!");
+        // Força reload buscando direto
+        const lista = await sb.get("mecanicos", "order=nome.asc");
+        setMecanicos(Array.isArray(lista) ? lista : []);
+      } else if (resultado?.message || resultado?.error) {
+        showMsg(`Erro: ${resultado.message || resultado.error}`, C.RED);
+      } else {
+        showMsg("Erro ao cadastrar. Verifique o console.", C.RED);
+        console.error("Resposta inesperada:", resultado);
+      }
+    } catch (e) {
+      showMsg("Erro de conexão.", C.RED);
+      console.error("adicionarMecanico erro:", e);
+    }
   };
 
   const toggleMecanico = async (id, ativo) => {
