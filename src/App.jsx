@@ -69,9 +69,20 @@ function LoginScreen({ onLogin, onAdm }) {
     if (c.length !== 11) { setErro("Digite um CPF válido com 11 dígitos."); return; }
     setLoading(true); setErro("");
     try {
-      const data = await sb.get("motoristas", `cpf=eq.${c}&ativo=eq.true`);
-      if (!Array.isArray(data) || data.length === 0) setErro("CPF não encontrado ou inativo. Fale com seu gestor.");
-      else onLogin({ cpf: c, nome: data[0].nome });
+      // Verifica motoristas e mecânicos simultaneamente
+      const [motorista, mecanico] = await Promise.all([
+        sb.get("motoristas", `cpf=eq.${c}&ativo=eq.true`),
+        sb.get("mecanicos", `cpf=eq.${c}&ativo=eq.true`),
+      ]);
+      const isMotorista = Array.isArray(motorista) && motorista.length > 0;
+      const isMecanico  = Array.isArray(mecanico)  && mecanico.length  > 0;
+      if (!isMotorista && !isMecanico) {
+        setErro("CPF não encontrado ou inativo. Fale com seu gestor.");
+      } else {
+        const nome = isMotorista ? motorista[0].nome : mecanico[0].nome;
+        // Se só mecânico → vai direto para oficina; se ambos → seleção de perfil
+        onLogin({ cpf: c, nome, perfilAuto: !isMotorista ? "oficina" : null });
+      }
     } catch { setErro("Erro de conexão. Tente novamente."); }
     setLoading(false);
   };
@@ -278,6 +289,7 @@ function PainelAdm({ onSair }) {
     { id:"motoristas",   label:"Motoristas" },
     { id:"quizzes",      label:"Quizzes" },
     { id:"regras",       label:"Regras" },
+    { id:"oficina",      label:"🔧 Oficina" },
     { id:"inteligencia", label:"Inteligência IA" },
   ];
 
@@ -659,6 +671,11 @@ Taxa de acerto geral: ${respostasData.length > 0 ? ((acertos.length / respostasD
               }
             </div>
           </div>
+        )}
+
+        {/* OFICINA ADM */}
+        {aba === "oficina" && (
+          <PainelOficinaAdm showMsg={showMsg} />
         )}
 
         {/* INTELIGÊNCIA IA */}
@@ -1061,6 +1078,7 @@ function ListaQuizzes({ usuario, onIniciar, onRevisar }) {
 // ══════════════════════════════════════════════════
 export default function App() {
   const [usuario, setUsuario] = useState(null);
+  const [perfil, setPerfil] = useState(null);
   const [isAdm, setIsAdm] = useState(false);
   const [tab, setTab] = useState("chat");
   const [msgs, setMsgs] = useState([]);
@@ -1084,6 +1102,8 @@ export default function App() {
 
   const handleLogin = async (user) => {
     setUsuario(user);
+    // Se só mecânico, pula seleção de perfil
+    if (user.perfilAuto) setPerfil(user.perfilAuto);
     setLoadingHist(true);
     try {
       const [hist, regs, qz, tent] = await Promise.all([
@@ -1188,6 +1208,8 @@ export default function App() {
 
   if (isAdm) return <PainelAdm onSair={() => setIsAdm(false)} />;
   if (!usuario) return <LoginScreen onLogin={handleLogin} onAdm={() => setIsAdm(true)} />;
+  if (perfil === "oficina") return <ModuloOficina usuario={usuario} onSair={() => { setUsuario(null); setPerfil(null); }} />;
+  if (!perfil) return <SelecionarPerfil usuario={usuario} onPerfil={setPerfil} onSair={() => setUsuario(null)} />;
   if (loadingHist) return (
     <div style={{ minHeight:"100vh", background:C.BG, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Barlow','Segoe UI',sans-serif" }}>
       <div style={{ textAlign:"center" }}>
@@ -1323,6 +1345,776 @@ export default function App() {
         ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:${C.NAV}}::-webkit-scrollbar-thumb{background:${C.BORDER2};border-radius:2px}
         input::placeholder{color:${C.MUTED2}}button:focus{outline:none}
       `}</style>
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════
+// SELEÇÃO DE PERFIL
+// ══════════════════════════════════════════════════
+function SelecionarPerfil({ usuario, onPerfil, onSair }) {
+  return (
+    <div style={{ minHeight:"100vh", background:C.BG, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontFamily:"'Barlow','Segoe UI',sans-serif", padding:24 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:48 }}>
+        <div style={{ width:3, height:40, background:C.RED }} />
+        <div>
+          <div style={{ fontSize:24, fontWeight:900, letterSpacing:2, color:C.WHITE, textTransform:"uppercase" }}>Bendini</div>
+          <div style={{ fontSize:9, letterSpacing:3.5, color:C.MUTED, textTransform:"uppercase", marginTop:2, fontWeight:600 }}>Operador Logístico</div>
+        </div>
+      </div>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"36px 32px", width:"100%", maxWidth:420 }}>
+        <div style={{ fontSize:10, color:C.RED, letterSpacing:2.5, fontWeight:900, textTransform:"uppercase", marginBottom:10 }}>Bem-vindo</div>
+        <div style={{ fontSize:20, fontWeight:900, color:C.WHITE, marginBottom:6 }}>{usuario.nome}</div>
+        <div style={{ fontSize:13, color:C.MUTED, marginBottom:28, lineHeight:1.6 }}>Selecione seu perfil de acesso:</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <button onClick={() => onPerfil("motorista")}
+            style={{ background:C.NAV, border:`2px solid ${C.BORDER2}`, borderRadius:2, padding:"20px 24px", cursor:"pointer", textAlign:"left", fontFamily:"inherit", transition:"border 0.15s" }}
+            onMouseOver={e => e.currentTarget.style.borderColor=C.RED}
+            onMouseOut={e => e.currentTarget.style.borderColor=C.BORDER2}>
+            <div style={{ fontSize:28, marginBottom:8 }}>🚛</div>
+            <div style={{ fontSize:15, fontWeight:900, color:C.WHITE, marginBottom:4 }}>Gestor de Unidade Móvel</div>
+            <div style={{ fontSize:12, color:C.MUTED }}>Motorista — acesso ao BEN, onboarding e quizzes da frota</div>
+          </button>
+          <button onClick={() => onPerfil("oficina")}
+            style={{ background:C.NAV, border:`2px solid ${C.BORDER2}`, borderRadius:2, padding:"20px 24px", cursor:"pointer", textAlign:"left", fontFamily:"inherit", transition:"border 0.15s" }}
+            onMouseOver={e => e.currentTarget.style.borderColor="#e67e22"}
+            onMouseOut={e => e.currentTarget.style.borderColor=C.BORDER2}>
+            <div style={{ fontSize:28, marginBottom:8 }}>🔧</div>
+            <div style={{ fontSize:15, fontWeight:900, color:C.WHITE, marginBottom:4 }}>Mecânico de Oficina</div>
+            <div style={{ fontSize:12, color:C.MUTED }}>Acesso ao BEN da oficina, procedimentos e quizzes de manutenção</div>
+          </button>
+        </div>
+        <button onClick={onSair} style={{ width:"100%", padding:"10px", background:"none", border:`1px solid ${C.BORDER}`, borderRadius:2, color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"inherit", marginTop:16 }}>← Trocar CPF</button>
+      </div>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// MÓDULO OFICINA — CHAT + QUIZ MECÂNICOS
+// ══════════════════════════════════════════════════
+function ModuloOficina({ usuario, onSair }) {
+  const [tab, setTab] = useState("chat");
+  const [msgs, setMsgs] = useState([]);
+  const [loadingHist, setLoadingHist] = useState(true);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [regras, setRegras] = useState([]);
+  const [quizAtivo, setQuizAtivo] = useState(null);
+  const [quizRevisando, setQuizRevisando] = useState(null);
+  const [quizzesCount, setQuizzesCount] = useState(0);
+  const endRef = useRef(null);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const [hist, regs, qz, tent] = await Promise.all([
+          sb.get("oficina_historico", `mecanico_cpf=eq.${encodeURIComponent(usuario.cpf)}&order=created_at.asc&limit=100`),
+          sb.get("oficina_regras", "ativo=eq.true&order=ordem.asc"),
+          sb.get("oficina_quizzes", "status=eq.ativo"),
+          sb.get("oficina_tentativas", `mecanico_cpf=eq.${usuario.cpf}`),
+        ]);
+        setRegras(Array.isArray(regs) ? regs : []);
+        const ativos = Array.isArray(qz) ? qz : [];
+        const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
+        setQuizzesCount(ativos.filter(q => !respondidos.has(q.id)).length);
+        if (Array.isArray(hist) && hist.length > 0) {
+          setMsgs(hist.map(m => ({ role: m.role, content: m.content })));
+        } else {
+          setMsgs([{ role:"assistant", content:`Olá, **${usuario.nome}**! Sou o **BEN**, assistente da Oficina Bendini.\n\nEstou aqui para responder suas dúvidas sobre procedimentos de manutenção, checklists e normas de segurança.\n\nComo posso ajudar?` }]);
+        }
+      } catch {
+        setMsgs([{ role:"assistant", content:`Olá, **${usuario.nome}**! Sou o **BEN** da Oficina.\n\nComo posso ajudar?` }]);
+      }
+      setLoadingHist(false);
+    };
+    init();
+  }, []);
+
+  const buildKnowledge = () => {
+    let base = `Você é o BEN, Assistente Oficial da Oficina Bendini Logística — agente de treinamento e suporte para mecânicos. Responda sempre em português brasileiro.\n\nTOM: Técnico, preciso e didático. Fale como um mecânico sênior experiente.\n\n`;
+    if (regras.length > 0) {
+      base += "=== PROCEDIMENTOS E NORMAS DA OFICINA BENDINI ===\n";
+      regras.forEach(r => { base += `\n${r.titulo.toUpperCase()}:\n${r.conteudo}\n`; });
+    }
+    return base;
+  };
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+    const txt = input.trim();
+    setInput("");
+    setMsgs(p => [...p, { role:"user", content: txt }]);
+    setLoading(true);
+    try {
+      const msgsParaApi = [...msgs.map(m => ({ role: m.role, content: m.content })), { role:"user", content: txt }];
+      const res = await api("ai_chat", {
+        model: "claude-haiku-4-5-20251001", max_tokens: 1000,
+        system: buildKnowledge(), messages: msgsParaApi,
+        mecanico: usuario.cpf, historico_table: "oficina_historico"
+      });
+      const reply = res.content?.[0]?.text || "Não foi possível processar. Tente novamente.";
+      setMsgs(p => [...p, { role:"assistant", content: reply }]);
+    } catch { setMsgs(p => [...p, { role:"assistant", content:"Erro de conexão. Tente novamente." }]); }
+    setLoading(false);
+  };
+
+  const TABS = [
+    { id:"chat", label:"Assistente IA" },
+    { id:"quiz", label:"Quiz", badge: quizzesCount > 0 ? quizzesCount : null },
+  ];
+
+  if (loadingHist) return (
+    <div style={{ minHeight:"100vh", background:C.BG, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Barlow','Segoe UI',sans-serif" }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontSize:13, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Carregando...</div>
+        <div style={{ display:"flex", gap:6, justifyContent:"center", marginTop:16 }}>
+          {[0,1,2].map(j => <div key={j} style={{ width:8, height:8, borderRadius:"50%", background:"#e67e22", animation:`bpulse 1s ${j*0.22}s infinite` }} />)}
+        </div>
+      </div>
+      <style>{`@keyframes bpulse{0%,80%,100%{transform:scale(0.5);opacity:0.3}40%{transform:scale(1);opacity:1}}`}</style>
+    </div>
+  );
+
+  const OC = { ...C, RED: "#e67e22", CARD2:"#1a2a1a" }; // laranja para oficina
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.BG, fontFamily:"'Barlow','Segoe UI',sans-serif", color:C.TEXT, display:"flex", flexDirection:"column" }}>
+      {/* Header */}
+      <div style={{ background:C.NAV, borderBottom:`1px solid ${C.BORDER}`, padding:"0 20px", display:"flex", alignItems:"center", height:62, gap:14, flexShrink:0 }}>
+        <div style={{ width:3, height:36, background:"#e67e22", flexShrink:0 }} />
+        <div>
+          <div style={{ fontSize:20, fontWeight:900, letterSpacing:2, color:C.WHITE, textTransform:"uppercase", lineHeight:1 }}>Bendini</div>
+          <div style={{ fontSize:8, letterSpacing:3.5, color:C.MUTED, textTransform:"uppercase", marginTop:3, fontWeight:600 }}>Oficina</div>
+        </div>
+        <div style={{ width:1, height:28, background:C.BORDER2, margin:"0 10px" }} />
+        <div style={{ fontSize:10, color:C.MUTED2, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase" }}>Agente BEN</div>
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ fontSize:11, color:C.MUTED, fontWeight:700 }}>🔧 {usuario.nome}</div>
+          <div style={{ width:1, height:16, background:C.BORDER2 }} />
+          <button onClick={onSair} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"4px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>Sair</button>
+        </div>
+      </div>
+
+      {/* Abas */}
+      <div style={{ background:C.NAV, borderBottom:`1px solid ${C.BORDER}`, display:"flex", flexShrink:0 }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setQuizAtivo(null); setQuizRevisando(null); }}
+            style={{ flex:1, padding:"13px 4px", background:t.id===tab?C.CARD:"none", border:"none", borderBottom:t.id===tab?"2px solid #e67e22":"2px solid transparent", color:t.id===tab?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase", position:"relative" }}>
+            {t.label}
+            {t.badge && <span style={{ position:"absolute", top:6, right:"calc(50% - 20px)", background:"#e67e22", color:C.WHITE, borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900 }}>{t.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column" }}>
+        {/* CHAT */}
+        {tab === "chat" && (
+          <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+            <div style={{ flex:1, overflowY:"auto", padding:"20px 16px", display:"flex", flexDirection:"column", gap:16 }}>
+              {msgs.map((m, i) => (
+                <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", gap:10, alignItems:"flex-end" }}>
+                  {m.role==="assistant" && <div style={{ width:32, height:32, borderRadius:2, background:"#e67e22", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.WHITE, flexShrink:0 }}>BEN</div>}
+                  <div style={{ maxWidth:"78%", padding:"10px 14px", borderRadius:m.role==="user"?"10px 10px 2px 10px":"10px 10px 10px 2px", background:m.role==="user"?"#e67e22":C.CARD, border:m.role==="assistant"?`1px solid ${C.BORDER}`:"none", fontSize:14, color:C.TEXT }}>
+                    {fmt(m.content)}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div style={{ display:"flex", alignItems:"flex-end", gap:10 }}>
+                  <div style={{ width:32, height:32, borderRadius:2, background:"#e67e22", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.WHITE, flexShrink:0 }}>BEN</div>
+                  <div style={{ padding:"12px 16px", background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:"10px 10px 10px 2px", display:"flex", gap:5, alignItems:"center" }}>
+                    {[0,1,2].map(j => <div key={j} style={{ width:5, height:5, borderRadius:"50%", background:"#e67e22", animation:`bpulse 1s ${j*0.22}s infinite` }} />)}
+                  </div>
+                </div>
+              )}
+              <div ref={endRef} />
+            </div>
+            <div style={{ padding:"6px 16px 8px", display:"flex", gap:7, overflowX:"auto", flexShrink:0 }}>
+              {["Como fazer revisão preventiva?","Checklist de inspeção do veículo","Normas de segurança na oficina","Troca de óleo — procedimento"].map(q => (
+                <button key={q} onClick={() => setInput(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, fontSize:10, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, letterSpacing:0.8, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>{q}</button>
+              ))}
+            </div>
+            <div style={{ padding:"10px 16px 12px", borderTop:`1px solid ${C.BORDER}`, display:"flex", gap:8, background:C.NAV, flexShrink:0 }}>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder="Digite sua dúvida sobre manutenção..."
+                style={{ flex:1, background:C.CARD, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 14px", color:C.TEXT, fontSize:13, outline:"none", fontFamily:"inherit" }} />
+              <button onClick={send} disabled={loading||!input.trim()} style={{ background:(!loading&&input.trim())?"#e67e22":C.CARD2, border:"none", borderRadius:2, width:46, cursor:(!loading&&input.trim())?"pointer":"not-allowed", color:(!loading&&input.trim())?C.WHITE:C.MUTED2, fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, flexShrink:0 }}>›</button>
+            </div>
+          </div>
+        )}
+
+        {/* QUIZ */}
+        {tab === "quiz" && !quizAtivo && !quizRevisando && (
+          <ListaQuizzesOficina usuario={usuario} onIniciar={setQuizAtivo} onRevisar={setQuizRevisando} />
+        )}
+        {tab === "quiz" && quizAtivo && (
+          <QuizOficina quiz={quizAtivo} usuario={usuario} onVoltar={() => setQuizAtivo(null)} />
+        )}
+        {tab === "quiz" && quizRevisando && (
+          <RevisaoOficina quiz={quizRevisando} usuario={usuario} onVoltar={() => setQuizRevisando(null)} />
+        )}
+      </div>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800;900&display=swap');@keyframes bpulse{0%,80%,100%{transform:scale(0.5);opacity:0.3}40%{transform:scale(1);opacity:1}}*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:${C.NAV}}::-webkit-scrollbar-thumb{background:${C.BORDER2};border-radius:2px}input::placeholder{color:${C.MUTED2}}button:focus{outline:none}`}</style>
+    </div>
+  );
+}
+
+// Lista de quizzes da oficina
+function ListaQuizzesOficina({ usuario, onIniciar, onRevisar }) {
+  const [quizzes, setQuizzes] = useState([]);
+  const [tentativas, setTentativas] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      sb.get("oficina_quizzes", "status=eq.ativo&order=created_at.desc"),
+      sb.get("oficina_tentativas", `mecanico_cpf=eq.${usuario.cpf}&order=created_at.desc`),
+    ]).then(([q, t]) => {
+      setQuizzes(Array.isArray(q) ? q : []);
+      setTentativas(Array.isArray(t) ? t : []);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando quizzes...</div>;
+
+  const tentPorQuiz = tentativas.reduce((acc, t) => {
+    if (!acc[t.quiz_id]) acc[t.quiz_id] = [];
+    acc[t.quiz_id].push(t);
+    return acc;
+  }, {});
+
+  const pendentes = quizzes.filter(q => !tentPorQuiz[q.id]);
+  const feitos = quizzes.filter(q => tentPorQuiz[q.id]);
+
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      {pendentes.length > 0 && (
+        <>
+          <div style={{ fontSize:10, color:"#e67e22", letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>🔴 Pendentes ({pendentes.length})</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:20 }}>
+            {pendentes.map((q, i) => (
+              <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                  <div style={{ fontSize:11, color:C.MUTED }}>10 perguntas — Não respondido</div>
+                </div>
+                <button onClick={() => onIniciar(q)} style={{ background:"#e67e22", border:"none", borderRadius:2, padding:"8px 16px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:1.5, fontWeight:900, textTransform:"uppercase", fontFamily:"inherit" }}>Responder →</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {feitos.length > 0 && (
+        <>
+          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>✓ Respondidos ({feitos.length})</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {feitos.map((q, i) => {
+              const ts = tentPorQuiz[q.id];
+              const melhor = Math.max(...ts.map(t => t.percentual));
+              return (
+                <div key={q.id} style={{ padding:"14px 16px", borderBottom:i<feitos.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                      <div style={{ fontSize:11, color:C.MUTED }}>Melhor: {Number(melhor).toFixed(0)}% — {ts.length}x respondido</div>
+                    </div>
+                    <div style={{ fontSize:18, fontWeight:900, color:melhor>=80?C.GREEN:melhor>=60?C.YELLOW:C.RED }}>{Number(melhor).toFixed(0)}%</div>
+                  </div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={() => onRevisar(q)} style={{ flex:1, background:"rgba(230,126,34,0.1)", border:"1px solid rgba(230,126,34,0.4)", borderRadius:2, padding:"8px 12px", color:"#e67e22", cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:800, textTransform:"uppercase", fontFamily:"inherit" }}>📋 Ver Erros</button>
+                    <button onClick={() => onIniciar(q)} style={{ flex:1, background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>↺ Refazer</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {quizzes.length === 0 && (
+        <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center", color:C.MUTED, fontSize:13 }}>
+          Nenhum quiz disponível ainda. Aguarde o gestor adicionar procedimentos.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Quiz da oficina
+function QuizOficina({ quiz, usuario, onVoltar }) {
+  const [questoes, setQuestoes] = useState([]);
+  const [qi, setQi] = useState(0);
+  const [qsel, setQsel] = useState(null);
+  const [qshow, setQshow] = useState(false);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    sb.get("oficina_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`).then(d => {
+      setQuestoes(Array.isArray(d) ? d : []);
+      setLoading(false);
+    });
+  }, [quiz.id]);
+
+  const answer = async (letra) => {
+    if (qsel) return;
+    const q = questoes[qi];
+    setQsel(letra);
+    setQshow(true);
+    const acertou = letra === q.correta;
+    if (acertou) setScore(s => s + 1);
+    try {
+      await sb.post("oficina_respostas", {
+        mecanico_nome: usuario.nome, quiz_titulo: quiz.titulo,
+        questao_id: q.id || null, pergunta: q.pergunta,
+        resposta_dada: letra, correta: q.correta, acertou,
+      });
+    } catch {}
+  };
+
+  const next = async () => {
+    if (qi + 1 >= questoes.length) {
+      const finalScore = score + (qsel === questoes[qi].correta ? 1 : 0);
+      const pct = (finalScore / questoes.length) * 100;
+      await sb.post("oficina_tentativas", {
+        quiz_id: quiz.id, mecanico_cpf: usuario.cpf,
+        mecanico_nome: usuario.nome, score: finalScore,
+        total: questoes.length, percentual: pct,
+      });
+      setDone(true);
+    } else {
+      setQi(i => i + 1); setQsel(null); setQshow(false);
+    }
+  };
+
+  const finalScore = done ? score : score + (qsel === questoes[qi]?.correta ? 1 : 0);
+  const pct = questoes.length > 0 ? (finalScore / questoes.length) * 100 : 0;
+
+  if (loading) return <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}><div style={{ color:C.MUTED, fontSize:13 }}>Carregando questões...</div></div>;
+
+  if (done) return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center" }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>{pct>=80?"🏆":pct>=60?"👍":"📚"}</div>
+        <div style={{ fontSize:9, color:"#e67e22", letterSpacing:2.5, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Resultado</div>
+        <div style={{ fontSize:48, fontWeight:900, color:C.WHITE, lineHeight:1 }}>{finalScore}<span style={{ fontSize:20, color:C.MUTED }}> /{questoes.length}</span></div>
+        <div style={{ fontSize:22, fontWeight:900, color:pct>=80?C.GREEN:pct>=60?C.YELLOW:C.RED, marginTop:6 }}>{pct.toFixed(0)}%</div>
+        <div style={{ fontSize:13, color:C.MUTED, marginTop:14, marginBottom:24 }}>{pct>=80?"Excelente!":pct>=60?"Bom resultado. Revise os pontos errados.":"Revise o procedimento e tente novamente."}</div>
+        <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+          <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 20px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+          <button onClick={() => { setQi(0); setQsel(null); setQshow(false); setScore(0); setDone(false); }} style={{ background:"#e67e22", border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", fontWeight:900 }}>↺ Refazer</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const q = questoes[qi];
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
+      <div style={{ fontSize:11, color:C.MUTED, marginBottom:4 }}>{quiz.titulo}</div>
+      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+        <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, fontWeight:800, textTransform:"uppercase" }}>Pergunta {qi+1} de {questoes.length}</span>
+        <span style={{ fontSize:9, color:C.GREEN, letterSpacing:1, fontWeight:800 }}>{score} corretas</span>
+      </div>
+      <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:22 }}>
+        <div style={{ height:"100%", width:`${(qi/questoes.length)*100}%`, background:"#e67e22", borderRadius:1 }} />
+      </div>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"20px 18px", marginBottom:14 }}>
+        <div style={{ fontSize:9, color:"#e67e22", letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Questão {qi+1}</div>
+        <div style={{ fontSize:16, fontWeight:700, lineHeight:1.5, color:C.WHITE }}>{q.pergunta}</div>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
+        {["a","b","c","d"].map(l => {
+          const isC = l === q.correta, isSel = l === qsel;
+          let bg=C.CARD, border=`1px solid ${C.BORDER}`, color=C.TEXT;
+          if (qshow) {
+            if (isC) { bg="rgba(46,204,113,0.07)"; border="1px solid #2ecc71"; color="#2ecc71"; }
+            else if (isSel) { bg="rgba(230,126,34,0.08)"; border="1px solid #e67e22"; color="#f0a060"; }
+          }
+          return (
+            <button key={l} onClick={() => answer(l)} style={{ background:bg, border, borderRadius:2, padding:"12px 16px", color, textAlign:"left", cursor:qsel?"default":"pointer", fontSize:14, lineHeight:1.4, width:"100%", fontFamily:"inherit" }}>
+              <span style={{ fontWeight:900, marginRight:10, color:C.MUTED2, fontSize:12 }}>{l.toUpperCase()}.</span>{q[`opcao_${l}`]}
+            </button>
+          );
+        })}
+      </div>
+      {qshow && (
+        <>
+          <div style={{ background:qsel===q.correta?"rgba(46,204,113,0.07)":"rgba(230,126,34,0.08)", border:`1px solid ${qsel===q.correta?"#2ecc71":"#e67e22"}`, borderRadius:2, padding:"12px 14px", marginBottom:14, fontSize:13, color:qsel===q.correta?"#2ecc71":"#f0a060", lineHeight:1.65 }}>
+            {qsel===q.correta?"✓ Correto — ":"✗ Incorreto — "}{q.explicacao}
+          </div>
+          <button onClick={next} style={{ width:"100%", padding:"14px", background:"#e67e22", border:"none", borderRadius:2, color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+            {qi+1>=questoes.length?"Ver Resultado":"Próxima →"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Revisão de erros da oficina
+function RevisaoOficina({ quiz, usuario, onVoltar }) {
+  const [respostas, setRespostas] = useState([]);
+  const [questoes, setQuestoes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      sb.get("oficina_respostas", `mecanico_nome=eq.${encodeURIComponent(usuario.nome)}&quiz_titulo=eq.${encodeURIComponent(quiz.titulo)}&order=created_at.desc&limit=100`),
+      sb.get("oficina_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`),
+    ]).then(([r, q]) => {
+      setRespostas(Array.isArray(r) ? r : []);
+      setQuestoes(Array.isArray(q) ? q : []);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando revisão...</div>;
+
+  const ultimaResposta = {};
+  respostas.forEach(r => { if (!ultimaResposta[r.questao_id]) ultimaResposta[r.questao_id] = r; });
+  const erros = Object.values(ultimaResposta).filter(r => !r.acertou);
+  const acertos = Object.values(ultimaResposta).filter(r => r.acertou);
+  const total = Object.values(ultimaResposta).length;
+  const pct = total > 0 ? Math.round((acertos.length / total) * 100) : 0;
+  const semDados = respostas.length === 0;
+
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"16px 20px", marginBottom:20 }}>
+        <div style={{ fontSize:10, color:"#e67e22", letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Revisão</div>
+        <div style={{ fontSize:17, fontWeight:900, color:C.WHITE, marginBottom:12 }}>{quiz.titulo}</div>
+        {!semDados && (
+          <div style={{ display:"flex", gap:20 }}>
+            {[{v:`${pct}%`,l:"Aproveitamento",cor:pct>=80?C.GREEN:pct>=60?C.YELLOW:C.RED},{v:acertos.length,l:"Acertos",cor:C.GREEN},{v:erros.length,l:"Erros",cor:C.RED}].map(x => (
+              <div key={x.l} style={{ textAlign:"center" }}>
+                <div style={{ fontSize:24, fontWeight:900, color:x.cor }}>{x.v}</div>
+                <div style={{ fontSize:10, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>{x.l}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {semDados ? (
+        <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:24, textAlign:"center" }}>
+          <div style={{ fontSize:28, marginBottom:8 }}>📋</div>
+          <div style={{ fontSize:14, color:C.WHITE, fontWeight:700, marginBottom:6 }}>Gabarito das questões</div>
+          <div style={{ fontSize:12, color:C.MUTED, marginBottom:20, lineHeight:1.6 }}>Refaça o quiz para ver seus erros em detalhes.</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10, textAlign:"left" }}>
+            {questoes.map((q, i) => (
+              <div key={q.id} style={{ background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"12px 14px" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.WHITE, marginBottom:8 }}>#{i+1} {q.pergunta}</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  {["a","b","c","d"].map(l => (
+                    <div key={l} style={{ padding:"4px 10px", borderRadius:2, background:q.correta===l?"rgba(46,204,113,0.1)":C.CARD, border:`1px solid ${q.correta===l?"#2ecc71":C.BORDER}`, fontSize:12, color:q.correta===l?"#2ecc71":C.MUTED }}>
+                      <span style={{ fontWeight:900 }}>{l.toUpperCase()}.</span> {q[`opcao_${l}`]} {q.correta===l && "✓"}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          {erros.length > 0 && (
+            <>
+              <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:4 }}>✗ O que você errou ({erros.length})</div>
+              {erros.map((r, i) => {
+                const q = questoes.find(q => q.id === r.questao_id) || {};
+                return (
+                  <div key={i} style={{ background:C.CARD, border:"1px solid rgba(192,57,43,0.4)", borderRadius:2, padding:"14px 16px" }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:12, lineHeight:1.5 }}>{r.pergunta}</div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12 }}>
+                      {["a","b","c","d"].map(l => {
+                        const isCorreta = l === r.correta, isErrada = l === r.resposta_dada;
+                        if (!isCorreta && !isErrada) return null;
+                        return (
+                          <div key={l} style={{ padding:"8px 12px", borderRadius:2, background:isCorreta?"rgba(46,204,113,0.08)":"rgba(192,57,43,0.08)", border:`1px solid ${isCorreta?"#2ecc71":C.RED}`, fontSize:13, color:isCorreta?"#2ecc71":"#e07070", display:"flex", gap:8, alignItems:"center" }}>
+                            <span style={{ fontWeight:900, fontSize:11 }}>{l.toUpperCase()}.</span>
+                            <span style={{ flex:1 }}>{q[`opcao_${l}`] || ""}</span>
+                            <span style={{ fontSize:10, fontWeight:900 }}>{isCorreta?"✓ Correta":"✗ Sua resposta"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {q.explicacao && <div style={{ fontSize:12, color:C.MUTED, lineHeight:1.6, fontStyle:"italic" }}>💡 {q.explicacao}</div>}
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {acertos.length > 0 && (
+            <>
+              <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginTop:8, marginBottom:4 }}>✓ O que você acertou ({acertos.length})</div>
+              {acertos.map((r, i) => (
+                <div key={i} style={{ background:C.CARD, border:"1px solid rgba(46,204,113,0.2)", borderRadius:2, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(46,204,113,0.15)", border:"1px solid #2ecc71", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"#2ecc71", flexShrink:0 }}>✓</div>
+                  <div style={{ fontSize:13, color:C.TEXT, lineHeight:1.5 }}>{r.pergunta}</div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// PAINEL ADM — ABA OFICINA
+// ══════════════════════════════════════════════════
+function PainelOficinaAdm({ showMsg }) {
+  const [subAba, setSubAba] = useState("mecanicos");
+  const [mecanicos, setMecanicos] = useState([]);
+  const [quizzes, setQuizzes] = useState([]);
+  const [regras, setRegras] = useState([]);
+  const [novoCpf, setNovoCpf] = useState("");
+  const [novoNome, setNovoNome] = useState("");
+  const [novaRegra, setNovaRegra] = useState({ titulo:"", conteudo:"" });
+  const [editandoRegra, setEditandoRegra] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [quizDetalhe, setQuizDetalhe] = useState(null);
+  const [tentativas, setTentativas] = useState([]);
+  const [mecList, setMecList] = useState([]);
+
+  useEffect(() => { carregarOficina(); }, [subAba]);
+
+  const carregarOficina = async () => {
+    setLoading(true);
+    try {
+      if (subAba === "mecanicos") {
+        const d = await sb.get("mecanicos", "order=nome.asc");
+        setMecanicos(Array.isArray(d) ? d : []);
+      } else if (subAba === "quizzes") {
+        const [q, m] = await Promise.all([
+          sb.get("oficina_quizzes", "order=created_at.desc"),
+          sb.get("mecanicos", "ativo=eq.true&order=nome.asc"),
+        ]);
+        setQuizzes(Array.isArray(q) ? q : []);
+        setMecList(Array.isArray(m) ? m : []);
+      } else if (subAba === "regras") {
+        const d = await sb.get("oficina_regras", "order=ordem.asc");
+        setRegras(Array.isArray(d) ? d : []);
+      }
+    } catch {}
+    setLoading(false);
+  };
+
+  const adicionarMecanico = async () => {
+    const c = cleanCPF(novoCpf);
+    if (c.length !== 11 || !novoNome.trim()) { showMsg("Preencha CPF e nome.", C.RED); return; }
+    await sb.post("mecanicos", { cpf: c, nome: novoNome.trim() });
+    setNovoCpf(""); setNovoNome("");
+    showMsg("Mecânico cadastrado!");
+    carregarOficina();
+  };
+
+  const toggleMecanico = async (id, ativo) => {
+    await sb.patch("mecanicos", `id=eq.${id}`, { ativo: !ativo });
+    carregarOficina();
+  };
+
+  const salvarRegra = async () => {
+    if (!novaRegra.titulo.trim() || !novaRegra.conteudo.trim()) { showMsg("Preencha título e conteúdo.", C.RED); return; }
+    if (editandoRegra) {
+      await sb.patch("oficina_regras", `id=eq.${editandoRegra}`, { titulo: novaRegra.titulo, conteudo: novaRegra.conteudo, updated_at: new Date().toISOString() });
+      setEditandoRegra(null);
+      showMsg("Procedimento atualizado!");
+    } else {
+      const result = await sb.post("oficina_regras", { titulo: novaRegra.titulo, conteudo: novaRegra.conteudo, ordem: regras.length, ativo: true });
+      const regra = Array.isArray(result) ? result[0] : result;
+      showMsg("Procedimento salvo! Gerando quiz...", C.YELLOW);
+      setGerando(true);
+      try {
+        const qr = await api("gerar_quiz_oficina", { regra_id: regra.id, titulo: novaRegra.titulo, conteudo: novaRegra.conteudo });
+        if (qr.ok) showMsg(`Quiz gerado com ${qr.total} perguntas! ✓`);
+        else showMsg("Procedimento salvo, mas erro ao gerar quiz.", C.YELLOW);
+      } catch { showMsg("Procedimento salvo, mas erro ao gerar quiz.", C.YELLOW); }
+      setGerando(false);
+    }
+    setNovaRegra({ titulo:"", conteudo:"" });
+    carregarOficina();
+  };
+
+  const verDetalheQuiz = async (quiz) => {
+    setQuizDetalhe(quiz);
+    const t = await sb.get("oficina_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`);
+    setTentativas(Array.isArray(t) ? t : []);
+  };
+
+  const OC = "#e67e22";
+  const SUBS = [
+    { id:"mecanicos", label:"Mecânicos" },
+    { id:"quizzes",   label:"Quizzes" },
+    { id:"regras",    label:"Procedimentos" },
+  ];
+
+  return (
+    <div>
+      {/* Sub-abas */}
+      <div style={{ display:"flex", gap:0, marginBottom:20, background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+        {SUBS.map(s => (
+          <button key={s.id} onClick={() => { setSubAba(s.id); setQuizDetalhe(null); }}
+            style={{ flex:1, padding:"11px 8px", background:subAba===s.id?C.CARD:"none", border:"none", borderBottom:subAba===s.id?`2px solid ${OC}`:"2px solid transparent", color:subAba===s.id?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* MECÂNICOS */}
+      {subAba === "mecanicos" && (
+        <div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, marginBottom:20 }}>
+            <div style={{ fontSize:10, color:OC, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>Cadastrar Mecânico</div>
+            <input value={novoCpf} onChange={e => setNovoCpf(formatCPF(e.target.value))} placeholder="CPF — 000.000.000-00"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:8, letterSpacing:1 }} />
+            <input value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Nome completo"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:12 }} />
+            <button onClick={adicionarMecanico} style={{ background:OC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>+ Cadastrar</button>
+          </div>
+          <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{mecanicos.length} mecânicos</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+              mecanicos.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum mecânico cadastrado.</div> :
+              mecanicos.map((m, i) => (
+                <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<mecanicos.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:m.ativo?C.WHITE:C.MUTED }}>{m.nome}</div>
+                    <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
+                  </div>
+                  <div style={{ fontSize:9, color:m.ativo?C.GREEN:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>{m.ativo?"Ativo":"Inativo"}</div>
+                  <button onClick={() => toggleMecanico(m.id, m.ativo)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"4px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>
+                    {m.ativo?"Desativar":"Ativar"}
+                  </button>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* QUIZZES OFICINA */}
+      {subAba === "quizzes" && !quizDetalhe && (
+        <div>
+          <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{quizzes.length} quizzes da oficina</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+              quizzes.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum quiz ainda. Adicione procedimentos para gerar quizzes.</div> :
+              quizzes.map((q, i) => (
+                <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<quizzes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                    <div style={{ fontSize:11, color:C.MUTED }}>{new Date(q.created_at).toLocaleDateString("pt-BR")}</div>
+                  </div>
+                  <button onClick={() => verDetalheQuiz(q)} style={{ background:OC, border:"none", borderRadius:2, padding:"6px 14px", color:C.WHITE, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>Ver Respostas</button>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* DETALHE QUIZ OFICINA */}
+      {subAba === "quizzes" && quizDetalhe && (
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+            <button onClick={() => setQuizDetalhe(null)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+            <div style={{ flex:1, fontSize:16, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
+          </div>
+          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✓ Responderam ({tentativas.length})</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
+            {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum mecânico respondeu ainda.</div> :
+              tentativas.map((t, i) => (
+                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.mecanico_nome}</div>
+                    <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.mecanico_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
+                    <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+          {(() => {
+            const responderam = new Set(tentativas.map(t => t.mecanico_cpf));
+            const pendentes = mecList.filter(m => !responderam.has(m.cpf));
+            return (
+              <>
+                <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✗ Pendentes ({pendentes.length})</div>
+                <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+                  {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos responderam!</div> :
+                    pendentes.map((m, i) => (
+                      <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                        <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{m.nome}</div>
+                          <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
+                        </div>
+                        <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* PROCEDIMENTOS */}
+      {subAba === "regras" && (
+        <div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, marginBottom:20 }}>
+            <div style={{ fontSize:10, color:OC, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
+              {editandoRegra ? "Editar Procedimento" : "Novo Procedimento"}
+            </div>
+            {!editandoRegra && (
+              <div style={{ fontSize:12, color:C.YELLOW, marginBottom:12, lineHeight:1.5 }}>
+                ⚡ Ao salvar, a IA gera automaticamente 10 perguntas de quiz para os mecânicos.
+              </div>
+            )}
+            <input value={novaRegra.titulo} onChange={e => setNovaRegra(p => ({...p, titulo:e.target.value}))} placeholder="Título do procedimento"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:8 }} />
+            <textarea value={novaRegra.conteudo} onChange={e => setNovaRegra(p => ({...p, conteudo:e.target.value}))} placeholder="Descreva o procedimento, checklist ou norma..." rows={4}
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginBottom:12, resize:"vertical", lineHeight:1.6 }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={salvarRegra} disabled={gerando} style={{ background:gerando?C.CARD2:OC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:gerando?"not-allowed":"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                {gerando?"Gerando quiz...":editandoRegra?"Salvar Edição":"+ Salvar e Gerar Quiz"}
+              </button>
+              {editandoRegra && (
+                <button onClick={() => { setEditandoRegra(null); setNovaRegra({titulo:"",conteudo:""}); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>
+              )}
+            </div>
+          </div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+              regras.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum procedimento cadastrado.</div> :
+              regras.map((r, i) => (
+                <div key={r.id} style={{ padding:"14px 16px", borderBottom:i<regras.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                    <div style={{ flex:1, fontSize:14, fontWeight:800, color:C.WHITE }}>{r.titulo}</div>
+                    <button onClick={() => { setEditandoRegra(r.id); setNovaRegra({titulo:r.titulo, conteudo:r.conteudo}); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"3px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>Editar</button>
+                    <button onClick={async () => { await sb.delete("oficina_regras", `id=eq.${r.id}`); showMsg("Procedimento excluído."); carregarOficina(); }} style={{ background:"none", border:"1px solid rgba(192,57,43,0.4)", borderRadius:2, padding:"3px 10px", color:C.RED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>Excluir</button>
+                  </div>
+                  <div style={{ fontSize:13, color:C.MUTED, lineHeight:1.6, whiteSpace:"pre-line" }}>{r.conteudo}</div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
     </div>
   );
 }
