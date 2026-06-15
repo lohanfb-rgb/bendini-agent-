@@ -63,11 +63,10 @@ module.exports = async function handler(req, res) {
       catch (e) { return res.status(500).json({ error: e.message }); }
     }
 
-    // GERAR QUIZ
+    // GERAR QUIZ (motoristas)
     if (action === "gerar_quiz") {
       const { regra_id, titulo, conteudo } = req.body;
       try {
-        // Truncar conteudo longo para evitar timeout (max 3000 chars)
         const conteudoFinal = (conteudo || "").length > 3000
           ? (conteudo || "").substring(0, 3000) + "..."
           : (conteudo || "");
@@ -89,38 +88,30 @@ Gere exatamente 10 perguntas praticas. Varie a posicao da resposta correta entre
         const aiData = await aiRes.json();
         const txt = (aiData.content?.[0]?.text || "").trim();
 
-        // Extracao robusta do JSON
         let json;
         try {
           const start = txt.indexOf("{");
           const end = txt.lastIndexOf("}");
           if (start === -1 || end === -1) throw new Error("JSON nao encontrado");
           json = JSON.parse(txt.substring(start, end + 1));
-        } catch (parseErr) {
-          return res.status(500).json({ error: "IA nao retornou JSON valido. Tente novamente com uma regra menor.", raw: txt.substring(0, 300) });
+        } catch {
+          return res.status(500).json({ error: "IA nao retornou JSON valido.", raw: txt.substring(0, 300) });
         }
 
-        if (!json.perguntas || !Array.isArray(json.perguntas) || json.perguntas.length === 0) {
-          return res.status(500).json({ error: "IA nao gerou perguntas. Tente novamente." });
-        }
+        if (!json.perguntas || !Array.isArray(json.perguntas) || json.perguntas.length === 0)
+          return res.status(500).json({ error: "IA nao gerou perguntas." });
 
-        // Criar o quiz
         const quizArr = await sbPost("quizzes", { regra_id, titulo: `Quiz: ${titulo}`, status: "ativo" });
         const quiz = Array.isArray(quizArr) ? quizArr[0] : quizArr;
 
-        // Criar as questoes
         for (let i = 0; i < json.perguntas.length; i++) {
           const p = json.perguntas[i];
           await sbPost("quiz_questoes", {
-            quiz_id: quiz.id,
-            pergunta: p.pergunta || "",
-            opcao_a: p.opcao_a || "",
-            opcao_b: p.opcao_b || "",
-            opcao_c: p.opcao_c || "",
-            opcao_d: p.opcao_d || "",
+            quiz_id: quiz.id, pergunta: p.pergunta || "",
+            opcao_a: p.opcao_a || "", opcao_b: p.opcao_b || "",
+            opcao_c: p.opcao_c || "", opcao_d: p.opcao_d || "",
             correta: (p.correta || "a").toLowerCase().trim(),
-            explicacao: p.explicacao || "",
-            ordem: i + 1,
+            explicacao: p.explicacao || "", ordem: i + 1,
           });
         }
 
@@ -130,16 +121,78 @@ Gere exatamente 10 perguntas praticas. Varie a posicao da resposta correta entre
       }
     }
 
-    // CHAT IA
+    // GERAR QUIZ OFICINA
+    if (action === "gerar_quiz_oficina") {
+      const { regra_id, titulo, conteudo } = req.body;
+      try {
+        const conteudoFinal = (conteudo || "").length > 3000
+          ? (conteudo || "").substring(0, 3000) + "..."
+          : (conteudo || "");
+
+        const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": AI, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 3000,
+            system: `Voce cria questoes de avaliacao para mecanicos de oficina de frota.
+Retorne SOMENTE o JSON abaixo, sem nenhum texto antes ou depois, sem markdown:
+{"perguntas":[{"pergunta":"...","opcao_a":"...","opcao_b":"...","opcao_c":"...","opcao_d":"...","correta":"a","explicacao":"..."}]}
+Gere exatamente 10 perguntas praticas sobre manutencao, seguranca e procedimentos. Varie a posicao da resposta correta entre a, b, c e d.`,
+            messages: [{ role: "user", content: `Procedimento da Oficina Bendini - ${titulo}:\n\n${conteudoFinal}\n\nGere 10 perguntas de multipla escolha sobre esse procedimento.` }]
+          })
+        });
+
+        const aiData = await aiRes.json();
+        const txt = (aiData.content?.[0]?.text || "").trim();
+
+        let json;
+        try {
+          const start = txt.indexOf("{");
+          const end = txt.lastIndexOf("}");
+          if (start === -1 || end === -1) throw new Error("JSON nao encontrado");
+          json = JSON.parse(txt.substring(start, end + 1));
+        } catch {
+          return res.status(500).json({ error: "IA nao retornou JSON valido.", raw: txt.substring(0, 300) });
+        }
+
+        if (!json.perguntas || !Array.isArray(json.perguntas) || json.perguntas.length === 0)
+          return res.status(500).json({ error: "IA nao gerou perguntas." });
+
+        const quizArr = await sbPost("oficina_quizzes", { regra_id, titulo: `Quiz: ${titulo}`, status: "ativo" });
+        const quiz = Array.isArray(quizArr) ? quizArr[0] : quizArr;
+
+        for (let i = 0; i < json.perguntas.length; i++) {
+          const p = json.perguntas[i];
+          await sbPost("oficina_questoes", {
+            quiz_id: quiz.id, pergunta: p.pergunta || "",
+            opcao_a: p.opcao_a || "", opcao_b: p.opcao_b || "",
+            opcao_c: p.opcao_c || "", opcao_d: p.opcao_d || "",
+            correta: (p.correta || "a").toLowerCase().trim(),
+            explicacao: p.explicacao || "", ordem: i + 1,
+          });
+        }
+
+        return res.status(200).json({ ok: true, quiz_id: quiz.id, total: json.perguntas.length });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // CHAT IA (motoristas e mecânicos)
     if (action === "ai_chat") {
-      const { messages, system, model, max_tokens, motorista } = req.body;
+      const { messages, system, model, max_tokens, motorista, mecanico, historico_table } = req.body;
       try {
         const lastMsg = messages[messages.length - 1];
-        // Salva texto da mensagem no histórico (extrai texto se for array com imagem)
         const textoHistorico = Array.isArray(lastMsg.content)
           ? (lastMsg.content.find(c => c.type === "text")?.text || "")
           : lastMsg.content;
-        await sbPost("historico_conversa", { motorista_nome: motorista, role: lastMsg.role, content: textoHistorico });
+
+        // Salva no histórico correto (motorista ou mecânico)
+        const tabela = historico_table || "historico_conversa";
+        const campo = mecanico ? "mecanico_cpf" : "motorista_nome";
+        const valor = mecanico || motorista;
+        await sbPost(tabela, { [campo]: valor, role: lastMsg.role, content: textoHistorico });
 
         const r = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -150,7 +203,7 @@ Gere exatamente 10 perguntas praticas. Varie a posicao da resposta correta entre
         const reply = d.content?.[0]?.text || "";
 
         if (reply) {
-          await sbPost("historico_conversa", { motorista_nome: motorista, role: "assistant", content: reply });
+          await sbPost(tabela, { [campo]: valor, role: "assistant", content: reply });
         }
         return res.status(r.status).json(d);
       } catch (e) { return res.status(500).json({ error: e.message }); }
