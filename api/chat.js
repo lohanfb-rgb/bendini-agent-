@@ -179,6 +179,64 @@ Gere exatamente 10 perguntas praticas sobre manutencao, seguranca e procedimento
       }
     }
 
+    // GERAR QUIZ PROGRAMADORES
+    if (action === "gerar_quiz_prog") {
+      const { regra_id, titulo, conteudo } = req.body;
+      try {
+        const conteudoFinal = (conteudo || "").length > 3000
+          ? (conteudo || "").substring(0, 3000) + "..."
+          : (conteudo || "");
+
+        const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": AI, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 3000,
+            system: `Voce cria questoes de avaliacao para programadores operacionais de transportadora.
+Retorne SOMENTE o JSON abaixo, sem nenhum texto antes ou depois, sem markdown:
+{"perguntas":[{"pergunta":"...","opcao_a":"...","opcao_b":"...","opcao_c":"...","opcao_d":"...","correta":"a","explicacao":"..."}]}
+Gere exatamente 10 perguntas praticas sobre regras operacionais, procedimentos de clientes e rotinas de programacao de cargas. Varie a posicao da resposta correta entre a, b, c e d.`,
+            messages: [{ role: "user", content: `Regra Operacional Bendini - ${titulo}:\n\n${conteudoFinal}\n\nGere 10 perguntas de multipla escolha sobre essa regra.` }]
+          })
+        });
+
+        const aiData = await aiRes.json();
+        const txt = (aiData.content?.[0]?.text || "").trim();
+
+        let json;
+        try {
+          const start = txt.indexOf("{");
+          const end = txt.lastIndexOf("}");
+          if (start === -1 || end === -1) throw new Error("JSON nao encontrado");
+          json = JSON.parse(txt.substring(start, end + 1));
+        } catch {
+          return res.status(500).json({ error: "IA nao retornou JSON valido.", raw: txt.substring(0, 300) });
+        }
+
+        if (!json.perguntas || !Array.isArray(json.perguntas) || json.perguntas.length === 0)
+          return res.status(500).json({ error: "IA nao gerou perguntas." });
+
+        const quizArr = await sbPost("prog_quizzes", { regra_id, titulo: `Quiz: ${titulo}`, status: "ativo" });
+        const quiz = Array.isArray(quizArr) ? quizArr[0] : quizArr;
+
+        for (let i = 0; i < json.perguntas.length; i++) {
+          const p = json.perguntas[i];
+          await sbPost("prog_questoes", {
+            quiz_id: quiz.id, pergunta: p.pergunta || "",
+            opcao_a: p.opcao_a || "", opcao_b: p.opcao_b || "",
+            opcao_c: p.opcao_c || "", opcao_d: p.opcao_d || "",
+            correta: (p.correta || "a").toLowerCase().trim(),
+            explicacao: p.explicacao || "", ordem: i + 1,
+          });
+        }
+
+        return res.status(200).json({ ok: true, quiz_id: quiz.id, total: json.perguntas.length });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     // CHAT IA (motoristas e mecânicos)
     if (action === "ai_chat") {
       const { messages, system, model, max_tokens, motorista, mecanico, historico_table } = req.body;
