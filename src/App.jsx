@@ -70,18 +70,23 @@ function LoginScreen({ onLogin, onAdm }) {
     setLoading(true); setErro("");
     try {
       // Verifica motoristas e mecânicos simultaneamente
-      const [motorista, mecanico] = await Promise.all([
+      const [motorista, mecanico, programador] = await Promise.all([
         sb.get("motoristas", `cpf=eq.${c}&ativo=eq.true`),
         sb.get("mecanicos", `cpf=eq.${c}&ativo=eq.true`),
+        sb.get("programadores", `cpf=eq.${c}&ativo=eq.true`),
       ]);
-      const isMotorista = Array.isArray(motorista) && motorista.length > 0;
-      const isMecanico  = Array.isArray(mecanico)  && mecanico.length  > 0;
-      if (!isMotorista && !isMecanico) {
+      const isMotorista   = Array.isArray(motorista)   && motorista.length   > 0;
+      const isMecanico    = Array.isArray(mecanico)    && mecanico.length    > 0;
+      const isProgramador = Array.isArray(programador) && programador.length > 0;
+      if (!isMotorista && !isMecanico && !isProgramador) {
         setErro("CPF não encontrado ou inativo. Fale com seu gestor.");
       } else {
-        const nome = isMotorista ? motorista[0].nome : mecanico[0].nome;
-        // Se só mecânico → vai direto para oficina; se ambos → seleção de perfil
-        onLogin({ cpf: c, nome, perfilAuto: !isMotorista ? "oficina" : null });
+        const nome = isMotorista ? motorista[0].nome : isMecanico ? mecanico[0].nome : programador[0].nome;
+        // Auto-perfil se só tem um perfil
+        let perfilAuto = null;
+        if (!isMotorista && !isMecanico && isProgramador) perfilAuto = "programador";
+        if (!isMotorista && isMecanico && !isProgramador) perfilAuto = "oficina";
+        onLogin({ cpf: c, nome, perfilAuto });
       }
     } catch { setErro("Erro de conexão. Tente novamente."); }
     setLoading(false);
@@ -290,6 +295,7 @@ function PainelAdm({ onSair }) {
     { id:"quizzes",      label:"Quizzes" },
     { id:"regras",       label:"Regras" },
     { id:"oficina",      label:"🔧 Oficina" },
+    { id:"prog",         label:"📋 Prog" },
     { id:"inteligencia", label:"Inteligência IA" },
   ];
 
@@ -676,6 +682,11 @@ Taxa de acerto geral: ${respostasData.length > 0 ? ((acertos.length / respostasD
         {/* OFICINA ADM */}
         {aba === "oficina" && (
           <PainelOficinaAdm showMsg={showMsg} />
+        )}
+
+        {/* PROG ADM */}
+        {aba === "prog" && (
+          <PainelProgAdm showMsg={showMsg} />
         )}
 
         {/* INTELIGÊNCIA IA */}
@@ -1209,6 +1220,7 @@ export default function App() {
   if (isAdm) return <PainelAdm onSair={() => setIsAdm(false)} />;
   if (!usuario) return <LoginScreen onLogin={handleLogin} onAdm={() => setIsAdm(true)} />;
   if (perfil === "oficina") return <ModuloOficina usuario={usuario} onSair={() => { setUsuario(null); setPerfil(null); }} />;
+  if (perfil === "programador") return <ModuloProg usuario={usuario} onSair={() => { setUsuario(null); setPerfil(null); }} />;
   if (!perfil) return <SelecionarPerfil usuario={usuario} onPerfil={setPerfil} onSair={() => setUsuario(null)} />;
   if (loadingHist) return (
     <div style={{ minHeight:"100vh", background:C.BG, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Barlow','Segoe UI',sans-serif" }}>
@@ -1383,6 +1395,14 @@ function SelecionarPerfil({ usuario, onPerfil, onSair }) {
             <div style={{ fontSize:28, marginBottom:8 }}>🔧</div>
             <div style={{ fontSize:15, fontWeight:900, color:C.WHITE, marginBottom:4 }}>Mecânico de Oficina</div>
             <div style={{ fontSize:12, color:C.MUTED }}>Acesso ao BEN da oficina, procedimentos e quizzes de manutenção</div>
+          </button>
+          <button onClick={() => onPerfil("programador")}
+            style={{ background:C.NAV, border:`2px solid ${C.BORDER2}`, borderRadius:2, padding:"20px 24px", cursor:"pointer", textAlign:"left", fontFamily:"inherit", transition:"border 0.15s" }}
+            onMouseOver={e => e.currentTarget.style.borderColor="#1a7a4a"}
+            onMouseOut={e => e.currentTarget.style.borderColor=C.BORDER2}>
+            <div style={{ fontSize:28, marginBottom:8 }}>📋</div>
+            <div style={{ fontSize:15, fontWeight:900, color:C.WHITE, marginBottom:4 }}>Programador Operacional</div>
+            <div style={{ fontSize:12, color:C.MUTED }}>Acesso ao BEN operacional, regras de clientes e quizzes</div>
           </button>
         </div>
         <button onClick={onSair} style={{ width:"100%", padding:"10px", background:"none", border:`1px solid ${C.BORDER}`, borderRadius:2, color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:1.5, textTransform:"uppercase", fontFamily:"inherit", marginTop:16 }}>← Trocar CPF</button>
@@ -2146,6 +2166,772 @@ function PainelOficinaAdm({ showMsg }) {
               ))
             }
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// MÓDULO PROGRAMADORES OPERACIONAIS
+// ══════════════════════════════════════════════════
+function ModuloProg({ usuario, onSair }) {
+  const [tab, setTab] = useState("chat");
+  const [msgs, setMsgs] = useState([]);
+  const [loadingHist, setLoadingHist] = useState(true);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [regras, setRegras] = useState([]);
+  const [quizAtivo, setQuizAtivo] = useState(null);
+  const [quizRevisando, setQuizRevisando] = useState(null);
+  const [quizzesCount, setQuizzesCount] = useState(0);
+  const [showSugestao, setShowSugestao] = useState(false);
+  const [sugestao, setSugestao] = useState({ titulo:"", conteudo:"" });
+  const [enviandoSugestao, setEnviandoSugestao] = useState(false);
+  const [msgSugestao, setMsgSugestao] = useState("");
+  const endRef = useRef(null);
+  const PC = "#1a7a4a"; // verde para programadores
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const [hist, regs, qz, tent] = await Promise.all([
+          sb.get("prog_historico", `programador_cpf=eq.${encodeURIComponent(usuario.cpf)}&order=created_at.asc&limit=100`),
+          sb.get("prog_regras", "ativo=eq.true&order=ordem.asc"),
+          sb.get("prog_quizzes", "status=eq.ativo"),
+          sb.get("prog_tentativas", `programador_cpf=eq.${usuario.cpf}`),
+        ]);
+        setRegras(Array.isArray(regs) ? regs : []);
+        const ativos = Array.isArray(qz) ? qz : [];
+        const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
+        setQuizzesCount(ativos.filter(q => !respondidos.has(q.id)).length);
+        if (Array.isArray(hist) && hist.length > 0) {
+          setMsgs(hist.map(m => ({ role: m.role, content: m.content })));
+        } else {
+          setMsgs([{ role:"assistant", content:`Olá, **${usuario.nome}**! Sou o **BEN**, assistente operacional da Bendini.\n\nEstou treinado em todos os procedimentos internos e regras de clientes. Pode me perguntar sobre qualquer operação, cliente ou processo.\n\nComo posso ajudar?` }]);
+        }
+      } catch {
+        setMsgs([{ role:"assistant", content:`Olá, **${usuario.nome}**! Sou o **BEN** Operacional.\n\nComo posso ajudar?` }]);
+      }
+      setLoadingHist(false);
+    };
+    init();
+  }, []);
+
+  const buildKnowledge = () => {
+    let base = `Você é o BEN, Assistente Operacional da Bendini Logística — especialista em programação de cargas, regras de clientes e procedimentos internos. Responda sempre em português brasileiro.\n\nTOM: Técnico, preciso e objetivo. Fale como um especialista operacional sênior.\n\nQuando perguntado sobre regras de um cliente específico, busque nas regras cadastradas e responda com base nelas. Se não houver regra cadastrada para o cliente, informe que não há procedimento registrado ainda.\n\n`;
+    if (regras.length > 0) {
+      base += "=== PROCEDIMENTOS OPERACIONAIS E REGRAS DE CLIENTES ===\n";
+      regras.forEach(r => { base += `\n${r.titulo.toUpperCase()}:\n${r.conteudo}\n`; });
+    }
+    return base;
+  };
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+    const txt = input.trim();
+    setInput("");
+    setMsgs(p => [...p, { role:"user", content: txt }]);
+    setLoading(true);
+    try {
+      const msgsParaApi = [...msgs.map(m => ({ role: m.role, content: m.content })), { role:"user", content: txt }];
+      const res = await api("ai_chat", {
+        model: "claude-haiku-4-5-20251001", max_tokens: 1500,
+        system: buildKnowledge(), messages: msgsParaApi,
+        mecanico: usuario.cpf, historico_table: "prog_historico"
+      });
+      const reply = res.content?.[0]?.text || "Não foi possível processar. Tente novamente.";
+      setMsgs(p => [...p, { role:"assistant", content: reply }]);
+    } catch { setMsgs(p => [...p, { role:"assistant", content:"Erro de conexão. Tente novamente." }]); }
+    setLoading(false);
+  };
+
+  const enviarSugestao = async () => {
+    if (!sugestao.titulo.trim() || !sugestao.conteudo.trim()) { setMsgSugestao("Preencha título e conteúdo."); return; }
+    setEnviandoSugestao(true);
+    try {
+      await sb.post("prog_sugestoes", {
+        programador_cpf: usuario.cpf,
+        programador_nome: usuario.nome,
+        titulo: sugestao.titulo.trim(),
+        conteudo: sugestao.conteudo.trim(),
+        status: "pendente",
+      });
+      setSugestao({ titulo:"", conteudo:"" });
+      setMsgSugestao("✅ Sugestão enviada! O gestor vai analisar.");
+      setTimeout(() => { setMsgSugestao(""); setShowSugestao(false); }, 3000);
+    } catch { setMsgSugestao("Erro ao enviar. Tente novamente."); }
+    setEnviandoSugestao(false);
+  };
+
+  const TABS = [
+    { id:"chat", label:"Assistente IA" },
+    { id:"quiz", label:"Quiz", badge: quizzesCount > 0 ? quizzesCount : null },
+  ];
+
+  if (loadingHist) return (
+    <div style={{ minHeight:"100vh", background:C.BG, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Barlow','Segoe UI',sans-serif" }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontSize:13, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Carregando...</div>
+        <div style={{ display:"flex", gap:6, justifyContent:"center", marginTop:16 }}>
+          {[0,1,2].map(j => <div key={j} style={{ width:8, height:8, borderRadius:"50%", background:PC, animation:`bpulse 1s ${j*0.22}s infinite` }} />)}
+        </div>
+      </div>
+      <style>{`@keyframes bpulse{0%,80%,100%{transform:scale(0.5);opacity:0.3}40%{transform:scale(1);opacity:1}}`}</style>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.BG, fontFamily:"'Barlow','Segoe UI',sans-serif", color:C.TEXT, display:"flex", flexDirection:"column" }}>
+      {/* Header */}
+      <div style={{ background:C.NAV, borderBottom:`1px solid ${C.BORDER}`, padding:"0 20px", display:"flex", alignItems:"center", height:62, gap:14, flexShrink:0 }}>
+        <div style={{ width:3, height:36, background:PC, flexShrink:0 }} />
+        <div>
+          <div style={{ fontSize:20, fontWeight:900, letterSpacing:2, color:C.WHITE, textTransform:"uppercase", lineHeight:1 }}>Bendini</div>
+          <div style={{ fontSize:8, letterSpacing:3.5, color:C.MUTED, textTransform:"uppercase", marginTop:3, fontWeight:600 }}>Programação Operacional</div>
+        </div>
+        <div style={{ width:1, height:28, background:C.BORDER2, margin:"0 10px" }} />
+        <div style={{ fontSize:10, color:C.MUTED2, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase" }}>Agente BEN</div>
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ fontSize:11, color:C.MUTED, fontWeight:700 }}>📋 {usuario.nome}</div>
+          <button onClick={() => setShowSugestao(true)} style={{ background:`rgba(26,122,74,0.15)`, border:`1px solid ${PC}`, borderRadius:2, padding:"4px 10px", color:PC, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>💡 Sugerir Regra</button>
+          <div style={{ width:1, height:16, background:C.BORDER2 }} />
+          <button onClick={onSair} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"4px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>Sair</button>
+        </div>
+      </div>
+
+      {/* Abas */}
+      <div style={{ background:C.NAV, borderBottom:`1px solid ${C.BORDER}`, display:"flex", flexShrink:0 }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setQuizAtivo(null); setQuizRevisando(null); }}
+            style={{ flex:1, padding:"13px 4px", background:t.id===tab?C.CARD:"none", border:"none", borderBottom:t.id===tab?`2px solid ${PC}`:"2px solid transparent", color:t.id===tab?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase", position:"relative" }}>
+            {t.label}
+            {t.badge && <span style={{ position:"absolute", top:6, right:"calc(50% - 20px)", background:PC, color:C.WHITE, borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900 }}>{t.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column", position:"relative" }}>
+
+        {/* Modal Sugestão */}
+        {showSugestao && (
+          <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.7)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+            <div style={{ background:C.CARD, border:`1px solid ${PC}`, borderRadius:2, padding:28, width:"100%", maxWidth:500 }}>
+              <div style={{ fontSize:10, color:PC, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:6 }}>💡 Sugerir Nova Regra</div>
+              <div style={{ fontSize:13, color:C.MUTED, marginBottom:20, lineHeight:1.6 }}>Identifiquei um procedimento ou regra que deveria estar na base? Descreva abaixo — o gestor vai analisar e aprovar.</div>
+              <input value={sugestao.titulo} onChange={e => setSugestao(p => ({...p, titulo:e.target.value}))} placeholder="Título da regra ou procedimento"
+                style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:10 }} />
+              <textarea value={sugestao.conteudo} onChange={e => setSugestao(p => ({...p, conteudo:e.target.value}))} placeholder="Descreva o procedimento, regra ou informação que deveria ser incluída..." rows={5}
+                style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginBottom:10, resize:"vertical", lineHeight:1.6 }} />
+              {msgSugestao && <div style={{ fontSize:12, color: msgSugestao.startsWith("✅") ? C.GREEN : C.RED, marginBottom:10 }}>{msgSugestao}</div>}
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={enviarSugestao} disabled={enviandoSugestao} style={{ background:enviandoSugestao?C.CARD2:PC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:enviandoSugestao?"not-allowed":"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                  {enviandoSugestao ? "Enviando..." : "Enviar Sugestão"}
+                </button>
+                <button onClick={() => { setShowSugestao(false); setSugestao({titulo:"",conteudo:""}); setMsgSugestao(""); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CHAT */}
+        {tab === "chat" && (
+          <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+            <div style={{ flex:1, overflowY:"auto", padding:"20px 16px", display:"flex", flexDirection:"column", gap:16 }}>
+              {msgs.map((m, i) => (
+                <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", gap:10, alignItems:"flex-end" }}>
+                  {m.role==="assistant" && <div style={{ width:32, height:32, borderRadius:2, background:PC, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.WHITE, flexShrink:0 }}>BEN</div>}
+                  <div style={{ maxWidth:"78%", padding:"10px 14px", borderRadius:m.role==="user"?"10px 10px 2px 10px":"10px 10px 10px 2px", background:m.role==="user"?PC:C.CARD, border:m.role==="assistant"?`1px solid ${C.BORDER}`:"none", fontSize:14, color:C.TEXT }}>
+                    {fmt(m.content)}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div style={{ display:"flex", alignItems:"flex-end", gap:10 }}>
+                  <div style={{ width:32, height:32, borderRadius:2, background:PC, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.WHITE, flexShrink:0 }}>BEN</div>
+                  <div style={{ padding:"12px 16px", background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:"10px 10px 10px 2px", display:"flex", gap:5, alignItems:"center" }}>
+                    {[0,1,2].map(j => <div key={j} style={{ width:5, height:5, borderRadius:"50%", background:PC, animation:`bpulse 1s ${j*0.22}s infinite` }} />)}
+                  </div>
+                </div>
+              )}
+              <div ref={endRef} />
+            </div>
+            <div style={{ padding:"6px 16px 8px", display:"flex", gap:7, overflowX:"auto", flexShrink:0 }}>
+              {["Regras do cliente X","Como emitir CT-e?","Janela de entrega — Dow","Procedimento de coleta"].map(q => (
+                <button key={q} onClick={() => setInput(q)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, fontSize:10, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, letterSpacing:0.8, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>{q}</button>
+              ))}
+            </div>
+            <div style={{ padding:"10px 16px 12px", borderTop:`1px solid ${C.BORDER}`, display:"flex", gap:8, background:C.NAV, flexShrink:0 }}>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder="Pergunte sobre regras, clientes ou procedimentos..."
+                style={{ flex:1, background:C.CARD, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 14px", color:C.TEXT, fontSize:13, outline:"none", fontFamily:"inherit" }} />
+              <button onClick={send} disabled={loading||!input.trim()} style={{ background:(!loading&&input.trim())?PC:C.CARD2, border:"none", borderRadius:2, width:46, cursor:(!loading&&input.trim())?"pointer":"not-allowed", color:(!loading&&input.trim())?C.WHITE:C.MUTED2, fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, flexShrink:0 }}>›</button>
+            </div>
+          </div>
+        )}
+
+        {/* QUIZ */}
+        {tab === "quiz" && !quizAtivo && !quizRevisando && <ListaQuizzesProg usuario={usuario} onIniciar={setQuizAtivo} onRevisar={setQuizRevisando} pc={PC} />}
+        {tab === "quiz" && quizAtivo && <QuizProg quiz={quizAtivo} usuario={usuario} onVoltar={() => setQuizAtivo(null)} pc={PC} />}
+        {tab === "quiz" && quizRevisando && <RevisaoProg quiz={quizRevisando} usuario={usuario} onVoltar={() => setQuizRevisando(null)} pc={PC} />}
+      </div>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800;900&display=swap');@keyframes bpulse{0%,80%,100%{transform:scale(0.5);opacity:0.3}40%{transform:scale(1);opacity:1}}*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:${C.NAV}}::-webkit-scrollbar-thumb{background:${C.BORDER2};border-radius:2px}input::placeholder,textarea::placeholder{color:${C.MUTED2}}button:focus{outline:none}`}</style>
+    </div>
+  );
+}
+
+function ListaQuizzesProg({ usuario, onIniciar, onRevisar, pc }) {
+  const [quizzes, setQuizzes] = useState([]);
+  const [tentativas, setTentativas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    Promise.all([
+      sb.get("prog_quizzes", "status=eq.ativo&order=created_at.desc"),
+      sb.get("prog_tentativas", `programador_cpf=eq.${usuario.cpf}&order=created_at.desc`),
+    ]).then(([q, t]) => { setQuizzes(Array.isArray(q)?q:[]); setTentativas(Array.isArray(t)?t:[]); setLoading(false); });
+  }, []);
+  if (loading) return <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando quizzes...</div>;
+  const tentPorQuiz = tentativas.reduce((acc, t) => { if (!acc[t.quiz_id]) acc[t.quiz_id]=[]; acc[t.quiz_id].push(t); return acc; }, {});
+  const pendentes = quizzes.filter(q => !tentPorQuiz[q.id]);
+  const feitos = quizzes.filter(q => tentPorQuiz[q.id]);
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      {pendentes.length > 0 && (<>
+        <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>🔴 Pendentes ({pendentes.length})</div>
+        <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:20 }}>
+          {pendentes.map((q,i) => (
+            <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+              <div style={{ flex:1 }}><div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div><div style={{ fontSize:11, color:C.MUTED }}>10 perguntas — Não respondido</div></div>
+              <button onClick={() => onIniciar(q)} style={{ background:pc, border:"none", borderRadius:2, padding:"8px 16px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:1.5, fontWeight:900, textTransform:"uppercase", fontFamily:"inherit" }}>Responder →</button>
+            </div>
+          ))}
+        </div>
+      </>)}
+      {feitos.length > 0 && (<>
+        <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:10 }}>✓ Respondidos ({feitos.length})</div>
+        <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+          {feitos.map((q,i) => {
+            const ts = tentPorQuiz[q.id];
+            const melhor = Math.max(...ts.map(t => t.percentual));
+            return (
+              <div key={q.id} style={{ padding:"14px 16px", borderBottom:i<feitos.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                  <div style={{ flex:1 }}><div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div><div style={{ fontSize:11, color:C.MUTED }}>Melhor: {Number(melhor).toFixed(0)}% — {ts.length}x respondido</div></div>
+                  <div style={{ fontSize:18, fontWeight:900, color:melhor>=80?C.GREEN:melhor>=60?C.YELLOW:C.RED }}>{Number(melhor).toFixed(0)}%</div>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={() => onRevisar(q)} style={{ flex:1, background:`rgba(26,122,74,0.1)`, border:`1px solid rgba(26,122,74,0.4)`, borderRadius:2, padding:"8px 12px", color:pc, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:800, textTransform:"uppercase", fontFamily:"inherit" }}>📋 Ver Erros</button>
+                  <button onClick={() => onIniciar(q)} style={{ flex:1, background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>↺ Refazer</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </>)}
+      {quizzes.length === 0 && <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center", color:C.MUTED, fontSize:13 }}>Nenhum quiz disponível ainda.</div>}
+    </div>
+  );
+}
+
+function QuizProg({ quiz, usuario, onVoltar, pc }) {
+  const [questoes, setQuestoes] = useState([]);
+  const [qi, setQi] = useState(0);
+  const [qsel, setQsel] = useState(null);
+  const [qshow, setQshow] = useState(false);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    sb.get("prog_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`).then(d => {
+      setQuestoes(Array.isArray(d)?d:[]);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [quiz.id]);
+  const answer = async (letra) => {
+    if (qsel) return;
+    const q = questoes[qi];
+    setQsel(letra); setQshow(true);
+    const acertou = letra === q.correta;
+    if (acertou) setScore(s => s+1);
+    try { await sb.post("prog_respostas", { programador_nome:usuario.nome, quiz_titulo:quiz.titulo, questao_id:q.id||null, pergunta:q.pergunta, resposta_dada:letra, correta:q.correta, acertou }); } catch {}
+  };
+  const next = async () => {
+    if (qi+1 >= questoes.length) {
+      const finalScore = score + (qsel === questoes[qi]?.correta ? 1 : 0);
+      const pct = (finalScore/questoes.length)*100;
+      await sb.post("prog_tentativas", { quiz_id:quiz.id, programador_cpf:usuario.cpf, programador_nome:usuario.nome, score:finalScore, total:questoes.length, percentual:pct });
+      setDone(true);
+    } else { setQi(i=>i+1); setQsel(null); setQshow(false); }
+  };
+  const finalScore = done ? score : score + (qsel === questoes[qi]?.correta ? 1 : 0);
+  const pct = questoes.length > 0 ? (finalScore/questoes.length)*100 : 0;
+  if (loading) return <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}><div style={{ color:C.MUTED, fontSize:13 }}>Carregando questões...</div></div>;
+  if (!questoes.length) return (
+    <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center", maxWidth:360 }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>⚠️</div>
+        <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:8 }}>Questões não encontradas</div>
+        <div style={{ fontSize:13, color:C.MUTED, marginBottom:20 }}>Este quiz ainda não tem questões cadastradas.</div>
+        <button onClick={onVoltar} style={{ background:pc, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", fontWeight:900 }}>← Voltar</button>
+      </div>
+    </div>
+  );
+  if (done) return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:32, textAlign:"center" }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>{pct>=80?"🏆":pct>=60?"👍":"📚"}</div>
+        <div style={{ fontSize:9, color:pc, letterSpacing:2.5, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Resultado</div>
+        <div style={{ fontSize:48, fontWeight:900, color:C.WHITE, lineHeight:1 }}>{finalScore}<span style={{ fontSize:20, color:C.MUTED }}> /{questoes.length}</span></div>
+        <div style={{ fontSize:22, fontWeight:900, color:pct>=80?C.GREEN:pct>=60?C.YELLOW:C.RED, marginTop:6 }}>{pct.toFixed(0)}%</div>
+        <div style={{ fontSize:13, color:C.MUTED, marginTop:14, marginBottom:24 }}>{pct>=80?"Excelente!":pct>=60?"Bom resultado. Revise os pontos errados.":"Revise o procedimento e tente novamente."}</div>
+        <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+          <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 20px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+          <button onClick={() => { setQi(0); setQsel(null); setQshow(false); setScore(0); setDone(false); }} style={{ background:pc, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", fontWeight:900 }}>↺ Refazer</button>
+        </div>
+      </div>
+    </div>
+  );
+  const q = questoes[qi] || {};
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"5px 12px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
+      <div style={{ fontSize:11, color:C.MUTED, marginBottom:4 }}>{quiz.titulo}</div>
+      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+        <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, fontWeight:800, textTransform:"uppercase" }}>Pergunta {qi+1} de {questoes.length}</span>
+        <span style={{ fontSize:9, color:C.GREEN, letterSpacing:1, fontWeight:800 }}>{score} corretas</span>
+      </div>
+      <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:22 }}>
+        <div style={{ height:"100%", width:`${(qi/questoes.length)*100}%`, background:pc, borderRadius:1 }} />
+      </div>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"20px 18px", marginBottom:14 }}>
+        <div style={{ fontSize:9, color:pc, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:12 }}>Questão {qi+1}</div>
+        <div style={{ fontSize:16, fontWeight:700, lineHeight:1.5, color:C.WHITE }}>{q.pergunta}</div>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
+        {["a","b","c","d"].map(l => {
+          const isC = l===q.correta, isSel = l===qsel;
+          let bg=C.CARD, border=`1px solid ${C.BORDER}`, color=C.TEXT;
+          if (qshow) { if (isC) { bg="rgba(46,204,113,0.07)"; border="1px solid #2ecc71"; color="#2ecc71"; } else if (isSel) { bg="rgba(26,122,74,0.08)"; border=`1px solid ${pc}`; color="#5dba8a"; } }
+          return (
+            <button key={l} onClick={() => answer(l)} style={{ background:bg, border, borderRadius:2, padding:"12px 16px", color, textAlign:"left", cursor:qsel?"default":"pointer", fontSize:14, lineHeight:1.4, width:"100%", fontFamily:"inherit" }}>
+              <span style={{ fontWeight:900, marginRight:10, color:C.MUTED2, fontSize:12 }}>{l.toUpperCase()}.</span>{q[`opcao_${l}`]}
+            </button>
+          );
+        })}
+      </div>
+      {qshow && (<>
+        <div style={{ background:qsel===q.correta?"rgba(46,204,113,0.07)":"rgba(26,122,74,0.08)", border:`1px solid ${qsel===q.correta?"#2ecc71":pc}`, borderRadius:2, padding:"12px 14px", marginBottom:14, fontSize:13, color:qsel===q.correta?"#2ecc71":"#5dba8a", lineHeight:1.65 }}>
+          {qsel===q.correta?"✓ Correto — ":"✗ Incorreto — "}{q.explicacao}
+        </div>
+        <button onClick={next} style={{ width:"100%", padding:"14px", background:pc, border:"none", borderRadius:2, color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+          {qi+1>=questoes.length?"Ver Resultado":"Próxima →"}
+        </button>
+      </>)}
+    </div>
+  );
+}
+
+function RevisaoProg({ quiz, usuario, onVoltar, pc }) {
+  const [respostas, setRespostas] = useState([]);
+  const [questoes, setQuestoes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    Promise.all([
+      sb.get("prog_respostas", `programador_nome=eq.${encodeURIComponent(usuario.nome)}&quiz_titulo=eq.${encodeURIComponent(quiz.titulo)}&order=created_at.desc&limit=100`),
+      sb.get("prog_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`),
+    ]).then(([r,q]) => { setRespostas(Array.isArray(r)?r:[]); setQuestoes(Array.isArray(q)?q:[]); setLoading(false); });
+  }, []);
+  if (loading) return <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Carregando revisão...</div>;
+  const ultima = {};
+  respostas.forEach(r => { if (!ultima[r.questao_id]) ultima[r.questao_id]=r; });
+  const erros = Object.values(ultima).filter(r => !r.acertou);
+  const acertos = Object.values(ultima).filter(r => r.acertou);
+  const total = Object.values(ultima).length;
+  const pct = total > 0 ? Math.round((acertos.length/total)*100) : 0;
+  const semDados = respostas.length === 0;
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+      <button onClick={onVoltar} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit", marginBottom:16 }}>← Voltar</button>
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"16px 20px", marginBottom:20 }}>
+        <div style={{ fontSize:10, color:pc, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Revisão</div>
+        <div style={{ fontSize:17, fontWeight:900, color:C.WHITE, marginBottom:12 }}>{quiz.titulo}</div>
+        {!semDados && (
+          <div style={{ display:"flex", gap:20 }}>
+            {[{v:`${pct}%`,l:"Aproveitamento",cor:pct>=80?C.GREEN:pct>=60?C.YELLOW:C.RED},{v:acertos.length,l:"Acertos",cor:C.GREEN},{v:erros.length,l:"Erros",cor:C.RED}].map(x => (
+              <div key={x.l} style={{ textAlign:"center" }}><div style={{ fontSize:24, fontWeight:900, color:x.cor }}>{x.v}</div><div style={{ fontSize:10, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>{x.l}</div></div>
+            ))}
+          </div>
+        )}
+      </div>
+      {semDados ? (
+        <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:24, textAlign:"center" }}>
+          <div style={{ fontSize:28, marginBottom:8 }}>📋</div>
+          <div style={{ fontSize:14, color:C.WHITE, fontWeight:700, marginBottom:6 }}>Gabarito das questões</div>
+          <div style={{ fontSize:12, color:C.MUTED, marginBottom:20 }}>Refaça o quiz para ver seus erros em detalhes.</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10, textAlign:"left" }}>
+            {questoes.map((q,i) => (
+              <div key={q.id} style={{ background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"12px 14px" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.WHITE, marginBottom:8 }}>#{i+1} {q.pergunta}</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  {["a","b","c","d"].map(l => (
+                    <div key={l} style={{ padding:"4px 10px", borderRadius:2, background:q.correta===l?"rgba(46,204,113,0.1)":C.CARD, border:`1px solid ${q.correta===l?"#2ecc71":C.BORDER}`, fontSize:12, color:q.correta===l?"#2ecc71":C.MUTED }}>
+                      <span style={{ fontWeight:900 }}>{l.toUpperCase()}.</span> {q[`opcao_${l}`]} {q.correta===l && "✓"}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          {erros.length > 0 && (<>
+            <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginBottom:4 }}>✗ O que você errou ({erros.length})</div>
+            {erros.map((r,i) => {
+              const q = questoes.find(q => q.id===r.questao_id) || {};
+              return (
+                <div key={i} style={{ background:C.CARD, border:"1px solid rgba(192,57,43,0.4)", borderRadius:2, padding:"14px 16px" }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:12, lineHeight:1.5 }}>{r.pergunta}</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12 }}>
+                    {["a","b","c","d"].map(l => {
+                      const isCorreta = l===r.correta, isErrada = l===r.resposta_dada;
+                      if (!isCorreta && !isErrada) return null;
+                      return (
+                        <div key={l} style={{ padding:"8px 12px", borderRadius:2, background:isCorreta?"rgba(46,204,113,0.08)":"rgba(192,57,43,0.08)", border:`1px solid ${isCorreta?"#2ecc71":C.RED}`, fontSize:13, color:isCorreta?"#2ecc71":"#e07070", display:"flex", gap:8, alignItems:"center" }}>
+                          <span style={{ fontWeight:900, fontSize:11 }}>{l.toUpperCase()}.</span>
+                          <span style={{ flex:1 }}>{q[`opcao_${l}`]||""}</span>
+                          <span style={{ fontSize:10, fontWeight:900 }}>{isCorreta?"✓ Correta":"✗ Sua resposta"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {q.explicacao && <div style={{ fontSize:12, color:C.MUTED, lineHeight:1.6, fontStyle:"italic" }}>💡 {q.explicacao}</div>}
+                </div>
+              );
+            })}
+          </>)}
+          {acertos.length > 0 && (<>
+            <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:800, textTransform:"uppercase", marginTop:8, marginBottom:4 }}>✓ O que você acertou ({acertos.length})</div>
+            {acertos.map((r,i) => (
+              <div key={i} style={{ background:C.CARD, border:"1px solid rgba(46,204,113,0.2)", borderRadius:2, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(46,204,113,0.15)", border:"1px solid #2ecc71", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"#2ecc71", flexShrink:0 }}>✓</div>
+                <div style={{ fontSize:13, color:C.TEXT, lineHeight:1.5 }}>{r.pergunta}</div>
+              </div>
+            ))}
+          </>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// PAINEL ADM — ABA PROG
+// ══════════════════════════════════════════════════
+function PainelProgAdm({ showMsg }) {
+  const [subAba, setSubAba] = useState("programadores");
+  const [programadores, setProgramadores] = useState([]);
+  const [regras, setRegras] = useState([]);
+  const [quizzes, setQuizzes] = useState([]);
+  const [sugestoes, setSugestoes] = useState([]);
+  const [novoCpf, setNovoCpf] = useState("");
+  const [novoNome, setNovoNome] = useState("");
+  const [novaRegra, setNovaRegra] = useState({ titulo:"", conteudo:"" });
+  const [editandoRegra, setEditandoRegra] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [quizDetalhe, setQuizDetalhe] = useState(null);
+  const [tentativas, setTentativas] = useState([]);
+  const [progList, setProgList] = useState([]);
+  const [feedbackRejeitar, setFeedbackRejeitar] = useState({});
+  const PC = "#1a7a4a";
+
+  useEffect(() => { carregarProg(); }, [subAba]);
+
+  const carregarProg = async () => {
+    setLoading(true);
+    try {
+      if (subAba === "programadores") {
+        const d = await sb.get("programadores", "order=nome.asc");
+        setProgramadores(Array.isArray(d)?d:[]);
+      } else if (subAba === "regras") {
+        const d = await sb.get("prog_regras", "order=ordem.asc");
+        setRegras(Array.isArray(d)?d:[]);
+      } else if (subAba === "quizzes") {
+        const [q, p] = await Promise.all([
+          sb.get("prog_quizzes", "order=created_at.desc"),
+          sb.get("programadores", "ativo=eq.true&order=nome.asc"),
+        ]);
+        setQuizzes(Array.isArray(q)?q:[]);
+        setProgList(Array.isArray(p)?p:[]);
+      } else if (subAba === "sugestoes") {
+        const d = await sb.get("prog_sugestoes", "order=created_at.desc");
+        setSugestoes(Array.isArray(d)?d:[]);
+      }
+    } catch {}
+    setLoading(false);
+  };
+
+  const adicionarProgramador = async () => {
+    const c = cleanCPF(novoCpf);
+    if (c.length !== 11 || !novoNome.trim()) { showMsg("Preencha CPF e nome.", C.RED); return; }
+    try {
+      const res = await sb.post("programadores", { cpf:c, nome:novoNome.trim() });
+      if (Array.isArray(res) && res.length > 0) {
+        setNovoCpf(""); setNovoNome("");
+        showMsg("Programador cadastrado!");
+        const lista = await sb.get("programadores", "order=nome.asc");
+        setProgramadores(Array.isArray(lista)?lista:[]);
+      } else { showMsg("Erro ao cadastrar. Verifique o console.", C.RED); }
+    } catch { showMsg("Erro de conexão.", C.RED); }
+  };
+
+  const toggleProg = async (id, ativo) => {
+    await sb.patch("programadores", `id=eq.${id}`, { ativo: !ativo });
+    carregarProg();
+  };
+
+  const salvarRegra = async () => {
+    if (!novaRegra.titulo.trim() || !novaRegra.conteudo.trim()) { showMsg("Preencha título e conteúdo.", C.RED); return; }
+    if (editandoRegra) {
+      await sb.patch("prog_regras", `id=eq.${editandoRegra}`, { titulo:novaRegra.titulo, conteudo:novaRegra.conteudo, updated_at:new Date().toISOString() });
+      setEditandoRegra(null);
+      showMsg("Procedimento atualizado!");
+    } else {
+      const result = await sb.post("prog_regras", { titulo:novaRegra.titulo, conteudo:novaRegra.conteudo, ordem:regras.length, ativo:true });
+      const regra = Array.isArray(result)?result[0]:result;
+      showMsg("Procedimento salvo! Gerando quiz...", C.YELLOW);
+      setGerando(true);
+      try {
+        const qr = await api("gerar_quiz_prog", { regra_id:regra.id, titulo:novaRegra.titulo, conteudo:novaRegra.conteudo });
+        if (qr.ok) showMsg(`Quiz gerado com ${qr.total} perguntas! ✓`);
+        else showMsg("Salvo, mas erro ao gerar quiz.", C.YELLOW);
+      } catch { showMsg("Salvo, mas erro ao gerar quiz.", C.YELLOW); }
+      setGerando(false);
+    }
+    setNovaRegra({ titulo:"", conteudo:"" });
+    carregarProg();
+  };
+
+  const aprovarSugestao = async (s) => {
+    // Cria a regra a partir da sugestão
+    const result = await sb.post("prog_regras", { titulo:s.titulo, conteudo:s.conteudo, ordem:0, ativo:true });
+    const regra = Array.isArray(result)?result[0]:result;
+    // Atualiza status da sugestão
+    await sb.patch("prog_sugestoes", `id=eq.${s.id}`, { status:"aprovada", updated_at:new Date().toISOString() });
+    showMsg("Sugestão aprovada e regra criada! Gerando quiz...", C.YELLOW);
+    try {
+      const qr = await api("gerar_quiz_prog", { regra_id:regra.id, titulo:s.titulo, conteudo:s.conteudo });
+      if (qr.ok) showMsg(`Regra aprovada! Quiz gerado com ${qr.total} perguntas ✓`);
+    } catch {}
+    carregarProg();
+  };
+
+  const rejeitarSugestao = async (s) => {
+    const feedback = feedbackRejeitar[s.id] || "";
+    await sb.patch("prog_sugestoes", `id=eq.${s.id}`, { status:"rejeitada", feedback_adm:feedback, updated_at:new Date().toISOString() });
+    showMsg("Sugestão rejeitada.");
+    setFeedbackRejeitar(p => ({...p, [s.id]:""}));
+    carregarProg();
+  };
+
+  const verDetalheQuiz = async (quiz) => {
+    setQuizDetalhe(quiz);
+    const t = await sb.get("prog_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`);
+    setTentativas(Array.isArray(t)?t:[]);
+  };
+
+  const SUBS = [
+    { id:"programadores", label:"Programadores" },
+    { id:"regras", label:"Procedimentos" },
+    { id:"quizzes", label:"Quizzes" },
+    { id:"sugestoes", label:`💡 Sugestões${sugestoes.filter(s=>s.status==="pendente").length>0?" ("+sugestoes.filter(s=>s.status==="pendente").length+")":""}` },
+  ];
+
+  return (
+    <div>
+      {/* Sub-abas */}
+      <div style={{ display:"flex", gap:0, marginBottom:20, background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+        {SUBS.map(s => (
+          <button key={s.id} onClick={() => { setSubAba(s.id); setQuizDetalhe(null); }}
+            style={{ flex:1, padding:"11px 8px", background:subAba===s.id?C.CARD:"none", border:"none", borderBottom:subAba===s.id?`2px solid ${PC}`:"2px solid transparent", color:subAba===s.id?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* PROGRAMADORES */}
+      {subAba === "programadores" && (
+        <div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, marginBottom:20 }}>
+            <div style={{ fontSize:10, color:PC, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>Cadastrar Programador</div>
+            <input value={novoCpf} onChange={e => setNovoCpf(formatCPF(e.target.value))} placeholder="CPF — 000.000.000-00"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:8, letterSpacing:1 }} />
+            <input value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Nome completo"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:12 }} />
+            <button onClick={adicionarProgramador} style={{ background:PC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>+ Cadastrar</button>
+          </div>
+          <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{programadores.length} programadores</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+              programadores.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum programador cadastrado.</div> :
+              programadores.map((p, i) => (
+                <div key={p.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<programadores.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:p.ativo?C.WHITE:C.MUTED }}>{p.nome}</div>
+                    <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(p.cpf)}</div>
+                  </div>
+                  <div style={{ fontSize:9, color:p.ativo?C.GREEN:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>{p.ativo?"Ativo":"Inativo"}</div>
+                  <button onClick={() => toggleProg(p.id, p.ativo)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"4px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>
+                    {p.ativo?"Desativar":"Ativar"}
+                  </button>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* PROCEDIMENTOS */}
+      {subAba === "regras" && (
+        <div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, marginBottom:20 }}>
+            <div style={{ fontSize:10, color:PC, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
+              {editandoRegra ? "Editar Procedimento" : "Novo Procedimento / Regra de Cliente"}
+            </div>
+            {!editandoRegra && <div style={{ fontSize:12, color:C.YELLOW, marginBottom:12, lineHeight:1.5 }}>⚡ Ao salvar, a IA gera automaticamente 10 perguntas de quiz. Use o título para identificar o cliente: ex: "Regras Cliente Dow Chemical"</div>}
+            <input value={novaRegra.titulo} onChange={e => setNovaRegra(p => ({...p, titulo:e.target.value}))} placeholder="Ex: Regras Cliente Dow Chemical | Procedimento de Emissão CT-e"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:8 }} />
+            <textarea value={novaRegra.conteudo} onChange={e => setNovaRegra(p => ({...p, conteudo:e.target.value}))} placeholder="Descreva o procedimento completo ou as regras do cliente..." rows={6}
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginBottom:12, resize:"vertical", lineHeight:1.6 }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={salvarRegra} disabled={gerando} style={{ background:gerando?C.CARD2:PC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:gerando?"not-allowed":"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                {gerando?"Gerando quiz...":editandoRegra?"Salvar Edição":"+ Salvar e Gerar Quiz"}
+              </button>
+              {editandoRegra && <button onClick={() => { setEditandoRegra(null); setNovaRegra({titulo:"",conteudo:""}); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>}
+            </div>
+          </div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+              regras.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum procedimento cadastrado.</div> :
+              regras.map((r, i) => (
+                <div key={r.id} style={{ padding:"14px 16px", borderBottom:i<regras.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                    <div style={{ flex:1, fontSize:14, fontWeight:800, color:C.WHITE }}>{r.titulo}</div>
+                    <button onClick={() => { setEditandoRegra(r.id); setNovaRegra({titulo:r.titulo, conteudo:r.conteudo}); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"3px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>Editar</button>
+                    <button onClick={async () => { await sb.delete("prog_regras", `id=eq.${r.id}`); showMsg("Procedimento excluído."); carregarProg(); }} style={{ background:"none", border:"1px solid rgba(192,57,43,0.4)", borderRadius:2, padding:"3px 10px", color:C.RED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>Excluir</button>
+                  </div>
+                  <div style={{ fontSize:13, color:C.MUTED, lineHeight:1.6, whiteSpace:"pre-line", maxHeight:80, overflow:"hidden" }}>{r.conteudo}</div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* QUIZZES */}
+      {subAba === "quizzes" && !quizDetalhe && (
+        <div>
+          <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{quizzes.length} quizzes</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+              quizzes.length === 0 ? <div style={{ padding:20, color:C.MUTED, fontSize:13 }}>Nenhum quiz ainda.</div> :
+              quizzes.map((q, i) => (
+                <div key={q.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderBottom:i<quizzes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.WHITE }}>{q.titulo}</div>
+                    <div style={{ fontSize:11, color:C.MUTED }}>{new Date(q.created_at).toLocaleDateString("pt-BR")}</div>
+                  </div>
+                  <button onClick={() => verDetalheQuiz(q)} style={{ background:PC, border:"none", borderRadius:2, padding:"6px 14px", color:C.WHITE, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>Ver Respostas</button>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* DETALHE QUIZ */}
+      {subAba === "quizzes" && quizDetalhe && (
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+            <button onClick={() => setQuizDetalhe(null)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+            <div style={{ flex:1, fontSize:16, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
+          </div>
+          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✓ Responderam ({tentativas.length})</div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
+            {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum programador respondeu ainda.</div> :
+              tentativas.map((t, i) => (
+                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.programador_nome}</div>
+                    <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.programador_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
+                    <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+          {(() => {
+            const responderam = new Set(tentativas.map(t => t.programador_cpf));
+            const pendentes = progList.filter(p => !responderam.has(p.cpf));
+            return (<>
+              <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✗ Pendentes ({pendentes.length})</div>
+              <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+                {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos responderam!</div> :
+                  pendentes.map((p, i) => (
+                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                      <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
+                      <div style={{ flex:1 }}><div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{p.nome}</div><div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(p.cpf)}</div></div>
+                      <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+                    </div>
+                  ))
+                }
+              </div>
+            </>);
+          })()}
+        </div>
+      )}
+
+      {/* SUGESTÕES */}
+      {subAba === "sugestoes" && (
+        <div>
+          <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:16 }}>
+            {sugestoes.filter(s => s.status==="pendente").length} pendentes · {sugestoes.filter(s => s.status==="aprovada").length} aprovadas · {sugestoes.filter(s => s.status==="rejeitada").length} rejeitadas
+          </div>
+          {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+            sugestoes.length === 0 ? <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:24, textAlign:"center", color:C.MUTED, fontSize:13 }}>Nenhuma sugestão recebida ainda.</div> :
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {sugestoes.map(s => (
+                <div key={s.id} style={{ background:C.CARD, border:`1px solid ${s.status==="pendente"?PC:s.status==="aprovada"?"#2ecc71":"rgba(192,57,43,0.4)"}`, borderRadius:2, padding:"16px 18px" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:800, color:C.WHITE }}>{s.titulo}</div>
+                      <div style={{ fontSize:11, color:C.MUTED }}>{s.programador_nome} · {new Date(s.created_at).toLocaleDateString("pt-BR")}</div>
+                    </div>
+                    <div style={{ fontSize:9, fontWeight:900, letterSpacing:1.5, textTransform:"uppercase", color:s.status==="pendente"?PC:s.status==="aprovada"?C.GREEN:C.RED, border:`1px solid ${s.status==="pendente"?PC:s.status==="aprovada"?"#2ecc71":"rgba(192,57,43,0.5)"}`, borderRadius:2, padding:"3px 8px" }}>
+                      {s.status==="pendente"?"⏳ Pendente":s.status==="aprovada"?"✓ Aprovada":"✗ Rejeitada"}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:13, color:C.MUTED, lineHeight:1.6, whiteSpace:"pre-line", maxHeight:100, overflow:"hidden", marginBottom:12 }}>{s.conteudo}</div>
+                  {s.feedback_adm && <div style={{ fontSize:12, color:C.MUTED, fontStyle:"italic", marginBottom:12 }}>Feedback: {s.feedback_adm}</div>}
+                  {s.status === "pendente" && (
+                    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                      <input value={feedbackRejeitar[s.id]||""} onChange={e => setFeedbackRejeitar(p => ({...p, [s.id]:e.target.value}))} placeholder="Feedback ao rejeitar (opcional)..."
+                        style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.WHITE, fontSize:12, outline:"none", fontFamily:"inherit" }} />
+                      <div style={{ display:"flex", gap:8 }}>
+                        <button onClick={() => aprovarSugestao(s)} style={{ flex:1, background:PC, border:"none", borderRadius:2, padding:"10px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>✓ Aprovar e Criar Regra</button>
+                        <button onClick={() => rejeitarSugestao(s)} style={{ flex:1, background:"none", border:"1px solid rgba(192,57,43,0.5)", borderRadius:2, padding:"10px", color:C.RED, fontWeight:700, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>✗ Rejeitar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          }
         </div>
       )}
     </div>
