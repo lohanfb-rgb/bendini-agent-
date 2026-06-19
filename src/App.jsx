@@ -54,6 +54,24 @@ const ONBOARDING = [
   { icon:"🏆", tag:"CONCLUÍDO", title:"Pronto para o Trabalho!", sub:"Onboarding básico concluído", body:"Lembre sempre:\n— Comunicação proativa em cada etapa\n— Respeite velocidades e jornada\n— Cuide do veículo como se fosse seu\n— Ranking elevado = mais prêmios\n— Use o BEN para qualquer dúvida\n\nBem-vindo ao time Bendini!" },
 ];
 
+const ONBOARDING_PROG = [
+  { icon:"📋", tag:"BOAS-VINDAS", title:"Bem-vindo à Programação Operacional", sub:"Você agora faz parte do time que move a operação", body:"Como Programador Operacional, você é responsável por planejar, acompanhar e garantir que cada carga chegue certinho ao destino — dentro do prazo, com a documentação correta e seguindo as regras de cada cliente.\n\nEste treinamento vai te dar a base necessária antes de você começar a operar no dia a dia." },
+  { icon:"🏢", tag:"A EMPRESA", title:"Quem é a Bendini Logística", sub:"Conheça a empresa que você representa", body:"A Bendini Logística é uma transportadora com operação nacional e internacional, especializada em cargas gerais e produtos químicos.\n\nTrabalhamos com certificação ISO 9001:2015, somos avaliados pelo SASSMAQ e fazemos parte do Programa OEA (Operador Econômico Autorizado) da Receita Federal — isso significa que seguimos padrões rígidos de segurança, qualidade e conformidade em tudo que fazemos." },
+  { icon:"🧭", tag:"SEU PAPEL", title:"O que faz um Programador Operacional", sub:"Suas principais responsabilidades", body:"— Pré-roteirizar e agendar veículos conforme a necessidade do cliente\n— Atualizar o status das viagens em tempo real (Pendente, Disponível, Em Viagem, Declinado)\n— Selecionar veículos próprios ou de terceiros (agregados)\n— Emitir e conferir documentação de viagem (CT-e, CRT-e, MIC)\n— Garantir que toda a documentação exigida pelo cliente está correta\n— Identificar e tratar qualquer suspeita ou irregularidade na carga" },
+  { icon:"💻", tag:"FERRAMENTAS", title:"Sistemas do Dia a Dia", sub:"As plataformas que você vai usar", body:"ESCALASOFT: nosso ERP — é onde você programa viagens, lança documentos, faz acertos e acompanha tudo.\n\nCELOG (Datatransp): sistema onde lançamos o pedido de carga.\n\n8QUALI: sistema da Qualidade — guarda as Instruções de Trabalho (IT), documentos externos e ocorrências (RAM).\n\nSISCOMEX: sistema da Receita Federal usado em operações de comércio exterior." },
+  { icon:"📄", tag:"DOCUMENTOS", title:"Entendendo os Códigos de Documentos", sub:"PO, IT, RQ e FL — o que cada um significa", body:"PO (Procedimento Operacional): o documento teórico, explica COMO um processo deve funcionar.\n\nIT (Instrução de Trabalho): o passo a passo prático, geralmente com telas do sistema, ensinando EXATAMENTE como fazer algo.\n\nRQ (Registro da Qualidade): documentos e formulários que comprovam que uma atividade foi realizada (ex: checklist preenchido).\n\nFL (Fluxograma): mostra visualmente o caminho de um processo, do início ao fim." },
+  { icon:"🚦", tag:"VIAGENS", title:"Status das Viagens", sub:"Entenda o ciclo de vida de uma viagem", body:"PENDENTE: nenhuma ação foi tomada ainda.\n\nDISPONÍVEL: o veículo está pronto para ser enviado.\n\nEM VIAGEM: o veículo está liberado e em trânsito.\n\nCARREGAMENTO DECLINADO: a viagem foi cancelada. Se o cliente avisar com menos de 6 horas de antecedência, é cobrada a taxa NOSHOW.\n\nVocê deve manter o status sempre atualizado — o cliente recebe a previsão de chegada automaticamente a cada 4 horas." },
+  { icon:"🚛", tag:"FROTA E TERCEIROS", title:"Veículos Próprios e Agregados", sub:"Quando não há frota própria disponível", body:"Quando a frota própria não está disponível, consultamos motoristas terceiros (chamados de Agregados).\n\nAntes de aprovar um terceiro, sempre é feito:\n— Consulta na gerenciadora de risco\n— Checklist visual do veículo (RQ 06 031)\n— Checklist do equipamento de rastreamento\n\nSó depois de aprovado o veículo fica disponível para você programar o carregamento." },
+  { icon:"⚠️", tag:"PRODUTOS QUÍMICOS", title:"Cuidado Redobrado com Químicos", sub:"Regras especiais que você precisa conhecer", body:"Cargas de produtos químicos exigem documentação extra: Ficha de Emergência, painéis de segurança e rótulos de risco no veículo.\n\nA Bendini transporta praticamente todas as classes de produtos perigosos, EXCETO explosivos (classe 1) e radioativos (classe 7).\n\nAntes de qualquer carregamento químico, o veículo passa por um checklist completo: EPIs, kit de emergência, extintor, sinalização e mais." },
+  { icon:"🌎", tag:"INTERNACIONAL", title:"Viagens Internacionais", sub:"Documentação para cruzar fronteiras", body:"Em viagens internacionais, o cliente envia a Fatura e o Packing List antecipadamente para a emissão da documentação.\n\nVocê, como programador, é responsável por fazer uma inspeção cuidadosa dessa documentação, identificando qualquer informação suspeita: valores incompatíveis, pesos divergentes, descrições estranhas.\n\nDocumentos como CRT, MIC e DUE são obrigatórios, e o checklist de 17 pontos se aplica a toda carga internacional." },
+  { icon:"📱", tag:"COMUNICAÇÃO", title:"Como Nos Comunicamos", sub:"Canais oficiais da operação", body:"Grupos de WhatsApp são essenciais: 'Gestão de Frotas' para necessidades de manutenção e status de viagem, e grupos específicos por cliente quando aplicável.\n\nO Follow-Up é enviado todo dia ao cliente, podendo ser automático ou personalizado.\n\nQualquer suspeita, irregularidade ou problema deve ser comunicado IMEDIATAMENTE ao responsável — nunca guarde uma dúvida de segurança para depois." },
+  { icon:"🤖", tag:"AGENTE BEN", title:"Como Usar Esta Plataforma", sub:"Seu assistente do dia a dia", body:"Aba Assistente IA: tire dúvidas a qualquer momento sobre regras internas ou de clientes específicos. É só perguntar — o BEN responde com base nos procedimentos cadastrados.\n\nAba Quiz: valide seu conhecimento respondendo os quizzes de cada procedimento. Você pode revisar os erros depois de cada tentativa.\n\nBotão 💡 Sugerir Regra: se você notar que falta algum procedimento na base, sugira! Seu gestor vai analisar e pode aprovar a inclusão." },
+  { icon:"🚦", tag:"REGRAS GERAIS", title:"Velocidade, Lacre e Pernoite", sub:"Regras de segurança que valem para toda operação", body:"VELOCIDADE: 5 km/h dentro do bairro da Bendini, e máximo de 90 km/h em viagem para qualquer cliente.\\n\\nPERNOITE: o veículo NUNCA pode pernoitar em frente à casa do motorista — isso anula o seguro da carga.\\n\\nLACRE: todo carregamento deve sair lacrado.\\n\\nPALLETS: mercadoria em pallets com sacaria precisa de cintas em todos os pallets, reforçadas nos primeiros e últimos.\\n\\nPOLIETILENO: só pode ser carregado por veículos agregados." },
+  { icon:"💰", tag:"REGRAS GERAIS", title:"Pagamentos, Diárias e Avarias", sub:"Como tratar dinheiro e ocorrências no dia a dia", body:"PAGAMENTO POR CHEQUE: sempre copiar e assinar o cheque, anexando ao processo.\\n\\nDIÁRIAS: avise o comercial sempre que ocorrerem. O pagamento ao terceiro só sai depois do faturamento ao cliente.\\n\\nAVARIAS: oriente o motorista a solicitar o TFA e envie escaneado ao cliente — nunca cobre avaria que não foi causada no transporte.\\n\\nOCORRÊNCIAS GRAVES: prejuízo acima de R$ 10.000 exige que um representante da Bendini vá ao local.\\n\\nEMPRÉSTIMO DE EQUIPAMENTO: sempre anote na capa do processo — senão, você é o responsável se não for devolvido." },
+  { icon:"🛡️", tag:"REGRAS GERAIS", title:"Escoltas e Cargas de Alto Valor", sub:"Quando o risco exige cuidado redobrado", body:"ESCOLTA PARA O RJ: obrigatória a partir da divisa SP-RJ, com apresentação 2 horas após o horário de carregamento.\\n\\nCARGAS DE ALTO VALOR EM SC: mercadorias acima de R$ 250.000 em operação nos portos de SC devem ser rastreadas.\\n\\nFINAL DE SEMANA: veículo agregado ou terceiro carregado fica no pátio da Bendini até iniciar a viagem — qualquer lugar diferente precisa de homologação da Gerenciadora de Risco.\\n\\nÁREA ALFANDEGADA: nunca misture mercadorias de processos diferentes dentro do mesmo veículo nessas áreas." },
+  { icon:"🏆", tag:"CONCLUÍDO", title:"Pronto para Começar!", sub:"Onboarding finalizado", body:"Você concluiu o treinamento inicial da Programação Operacional.\n\nAgora é hora de validar seu conhecimento nos Quizzes — cada procedimento tem um quiz específico, e você pode refazer quantas vezes precisar.\n\nLembre-se: o BEN está sempre disponível para tirar dúvidas. Em caso de qualquer incerteza na operação, pergunte antes de agir.\n\nBem-vindo ao time Bendini!" },
+];
+
 // ══════════════════════════════════════════════════
 // LOGIN
 // ══════════════════════════════════════════════════
@@ -2189,6 +2207,8 @@ function ModuloProg({ usuario, onSair }) {
   const [sugestao, setSugestao] = useState({ titulo:"", conteudo:"" });
   const [enviandoSugestao, setEnviandoSugestao] = useState(false);
   const [msgSugestao, setMsgSugestao] = useState("");
+  const [onboardingDone, setOnboardingDone] = useState(true); // assume true até checar no banco
+  const [obStep, setObStep] = useState(0);
   const endRef = useRef(null);
   const PC = "#1a7a4a"; // verde para programadores
 
@@ -2197,16 +2217,24 @@ function ModuloProg({ usuario, onSair }) {
   useEffect(() => {
     const init = async () => {
       try {
-        const [hist, regs, qz, tent] = await Promise.all([
+        const [hist, regs, qz, tent, progReg] = await Promise.all([
           sb.get("prog_historico", `programador_cpf=eq.${encodeURIComponent(usuario.cpf)}&order=created_at.asc&limit=100`),
           sb.get("prog_regras", "ativo=eq.true&order=ordem.asc"),
           sb.get("prog_quizzes", "status=eq.ativo"),
           sb.get("prog_tentativas", `programador_cpf=eq.${usuario.cpf}`),
+          sb.get("programadores", `cpf=eq.${usuario.cpf}`),
         ]);
         setRegras(Array.isArray(regs) ? regs : []);
         const ativos = Array.isArray(qz) ? qz : [];
         const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
         setQuizzesCount(ativos.filter(q => !respondidos.has(q.id)).length);
+
+        // Verifica se já concluiu o onboarding
+        const progData = Array.isArray(progReg) && progReg.length > 0 ? progReg[0] : null;
+        const done = progData?.onboarding_completo === true;
+        setOnboardingDone(done);
+        if (!done) setTab("onboarding");
+
         if (Array.isArray(hist) && hist.length > 0) {
           setMsgs(hist.map(m => ({ role: m.role, content: m.content })));
         } else {
@@ -2219,6 +2247,14 @@ function ModuloProg({ usuario, onSair }) {
     };
     init();
   }, []);
+
+  const concluirOnboarding = async () => {
+    try {
+      await sb.patch("programadores", `cpf=eq.${usuario.cpf}`, { onboarding_completo: true });
+    } catch {}
+    setOnboardingDone(true);
+    setTab("chat");
+  };
 
   const buildKnowledge = () => {
     let base = `Você é o BEN, Assistente Operacional da Bendini Logística — especialista em programação de cargas, regras de clientes e procedimentos internos. Responda sempre em português brasileiro.\n\nTOM: Técnico, preciso e objetivo. Fale como um especialista operacional sênior.\n\nQuando perguntado sobre regras de um cliente específico, busque nas regras cadastradas e responda com base nelas. Se não houver regra cadastrada para o cliente, informe que não há procedimento registrado ainda.\n\n`;
@@ -2267,6 +2303,7 @@ function ModuloProg({ usuario, onSair }) {
   };
 
   const TABS = [
+    { id:"onboarding", label:"Onboarding", badge: !onboardingDone ? "!" : null },
     { id:"chat", label:"Assistente IA" },
     { id:"quiz", label:"Quiz", badge: quizzesCount > 0 ? quizzesCount : null },
   ];
@@ -2371,10 +2408,54 @@ function ModuloProg({ usuario, onSair }) {
           </div>
         )}
 
+        {/* ONBOARDING */}
+        {tab === "onboarding" && (
+          <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Progresso</span>
+              <span style={{ fontSize:9, color:PC, letterSpacing:1, fontWeight:800 }}>{obStep+1} / {ONBOARDING_PROG.length}</span>
+            </div>
+            <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:20 }}>
+              <div style={{ height:"100%", width:`${((obStep+1)/ONBOARDING_PROG.length)*100}%`, background:PC, transition:"width 0.4s", borderRadius:1 }} />
+            </div>
+            <div style={{ display:"flex", gap:5, marginBottom:22, flexWrap:"wrap" }}>
+              {ONBOARDING_PROG.map((_,i) => <div key={i} onClick={() => setObStep(i)} style={{ width:i===obStep?24:8, height:3, background:i<=obStep?PC:C.BORDER2, cursor:"pointer", transition:"all 0.3s", borderRadius:2 }} />)}
+            </div>
+            <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"24px 20px", marginBottom:16 }}>
+              <div style={{ fontSize:10, display:"inline-block", background:PC, color:C.WHITE, letterSpacing:2, fontWeight:900, padding:"3px 9px", marginBottom:16, textTransform:"uppercase" }}>{ONBOARDING_PROG[obStep].tag}</div>
+              <div style={{ fontSize:28, marginBottom:10 }}>{ONBOARDING_PROG[obStep].icon}</div>
+              <div style={{ fontSize:22, fontWeight:900, color:C.WHITE, marginBottom:6, letterSpacing:-0.5, lineHeight:1.2 }}>{ONBOARDING_PROG[obStep].title}</div>
+              <div style={{ fontSize:11, color:C.MUTED, letterSpacing:1.5, textTransform:"uppercase", fontWeight:700, marginBottom:20 }}>{ONBOARDING_PROG[obStep].sub}</div>
+              <div style={{ fontSize:14, color:C.TEXT, whiteSpace:"pre-line", lineHeight:1.85 }}>{ONBOARDING_PROG[obStep].body}</div>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => setObStep(s => Math.max(0,s-1))} disabled={obStep===0} style={{ flex:1, padding:"13px", background:"none", border:`1px solid ${obStep===0?C.BORDER:C.BORDER2}`, borderRadius:2, color:obStep===0?C.MUTED2:C.MUTED, cursor:obStep===0?"not-allowed":"pointer", fontWeight:800, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>← Anterior</button>
+              {obStep < ONBOARDING_PROG.length - 1 ? (
+                <button onClick={() => setObStep(s => Math.min(ONBOARDING_PROG.length-1,s+1))} style={{ flex:2, padding:"13px", background:PC, border:"none", borderRadius:2, color:C.WHITE, cursor:"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Próximo →</button>
+              ) : (
+                <button onClick={concluirOnboarding} style={{ flex:2, padding:"13px", background:PC, border:"none", borderRadius:2, color:C.WHITE, cursor:"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>✓ Concluir Onboarding</button>
+              )}
+            </div>
+            {onboardingDone && (
+              <div style={{ marginTop:16, textAlign:"center", fontSize:11, color:C.GREEN, fontWeight:700 }}>✓ Você já concluiu este onboarding. Pode revisar à vontade.</div>
+            )}
+          </div>
+        )}
+
         {/* QUIZ */}
-        {tab === "quiz" && !quizAtivo && !quizRevisando && <ListaQuizzesProg usuario={usuario} onIniciar={setQuizAtivo} onRevisar={setQuizRevisando} pc={PC} />}
-        {tab === "quiz" && quizAtivo && <QuizProg quiz={quizAtivo} usuario={usuario} onVoltar={() => setQuizAtivo(null)} pc={PC} />}
-        {tab === "quiz" && quizRevisando && <RevisaoProg quiz={quizRevisando} usuario={usuario} onVoltar={() => setQuizRevisando(null)} pc={PC} />}
+        {tab === "quiz" && !onboardingDone && (
+          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+            <div style={{ background:C.CARD, border:`1px solid ${PC}`, borderRadius:2, padding:32, textAlign:"center", maxWidth:380 }}>
+              <div style={{ fontSize:32, marginBottom:12 }}>🔒</div>
+              <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:8 }}>Complete o Onboarding primeiro</div>
+              <div style={{ fontSize:13, color:C.MUTED, marginBottom:20, lineHeight:1.6 }}>Antes de responder os quizzes, é necessário concluir o treinamento inicial de onboarding.</div>
+              <button onClick={() => setTab("onboarding")} style={{ background:PC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", fontWeight:900 }}>Ir para o Onboarding →</button>
+            </div>
+          </div>
+        )}
+        {tab === "quiz" && onboardingDone && !quizAtivo && !quizRevisando && <ListaQuizzesProg usuario={usuario} onIniciar={setQuizAtivo} onRevisar={setQuizRevisando} pc={PC} />}
+        {tab === "quiz" && onboardingDone && quizAtivo && <QuizProg quiz={quizAtivo} usuario={usuario} onVoltar={() => setQuizAtivo(null)} pc={PC} />}
+        {tab === "quiz" && onboardingDone && quizRevisando && <RevisaoProg quiz={quizRevisando} usuario={usuario} onVoltar={() => setQuizRevisando(null)} pc={PC} />}
       </div>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800;900&display=swap');@keyframes bpulse{0%,80%,100%{transform:scale(0.5);opacity:0.3}40%{transform:scale(1);opacity:1}}*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:${C.NAV}}::-webkit-scrollbar-thumb{background:${C.BORDER2};border-radius:2px}input::placeholder,textarea::placeholder{color:${C.MUTED2}}button:focus{outline:none}`}</style>
     </div>
