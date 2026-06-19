@@ -43,35 +43,6 @@ const formatCPF = (v) => {
 };
 const cleanCPF = (v) => v.replace(/\D/g, "");
 
-const ONBOARDING = [
-  { icon:"🚛", tag:"BOAS-VINDAS", title:"Bem-vindo à Bendini", sub:"Você agora é um Gestor de Unidade Móvel", body:"Essa é a denominação especial que damos aos nossos motoristas, reconhecendo sua importância estratégica.\n\n\"Desejamos as boas-vindas, muitas realizações e sucesso.\"\n— Everton Pereira Bendini" },
-  { icon:"📋", tag:"INTEGRAÇÃO", title:"Primeiros 2 Dias", sub:"Apresentação em todos os setores", body:"Você será conduzido pelo seu gestor direto em uma integração completa.\n\nNo primeiro dia você recebe:\n— Kit de EPIs completo\n— Crachá e uniforme\n— Chip corporativo VIVO\n— Inclusão nos grupos de WhatsApp\n\nUso obrigatório: calça jeans ou brim + sapato de segurança + crachá." },
-  { icon:"📡", tag:"COMUNICAÇÃO", title:"Grupos e Comunicação", sub:"Comunicação proativa é fundamental", body:"2 grupos de WhatsApp obrigatórios:\n\nFROTA/GESTOR: operações e status de viagem.\nUTILIDADES: informações gerais — sempre reagir com 👍🏻.\n\nChip VIVO: prefixo 15 (015 + DDD + número).\nReunião mensal todo segundo sábado — obrigatória." },
-  { icon:"💰", tag:"REMUNERAÇÃO", title:"Salário e Prêmios", sub:"Seu desempenho define seu ganho", body:"FIXO: salário base + 30% periculosidade + DSR + Cartão Caju R$95/dia.\n\nPRÊMIOS VARIÁVEIS:\n— 3% Produtividade\n— 1% Comprometimento\n— 1% Não Avarias\n— 4% Extra Economia\n\nTotal: 9% sobre o faturamento." },
-  { icon:"📊", tag:"RANKING", title:"Ranking de Desempenho", sub:"Média dos últimos 6 meses", body:"Critérios:\n— Faturamento: até 5 pontos\n— Extra Economia: até 1,5 pontos\n— Ocorrências: até 2 pontos\n\nMínimo: 8,5 pontos.\nAbaixo de 8,0 por 3 meses = risco de rescisão." },
-  { icon:"⚠️", tag:"SEGURANÇA", title:"Segurança na Estrada", sub:"Regras inegociáveis", body:"VELOCIDADES:\n— Geral: 85 km/h\n— Chuva/neblina: 75 km/h\n— Químico: 80 km/h\n— Pedágios: 40 km/h\n\nJORNADA: parar até 23h / retomar às 04h.\nCinto sempre. Celular proibido ao volante." },
-  { icon:"🗺️", tag:"OPERAÇÃO", title:"Viagem — Passo a Passo", sub:"Protocolo obrigatório", body:"1. Receber programação no grupo\n2. Enviar macro INÍCIO DE VIAGEM\n3. Aguardar 'LIBERADO'\n4. Comunicar cada etapa\n5. Reaperto das cintas a cada 200 km\n6. Macro de FIM só com canhotos assinados\n7. Foto dos comprovantes no grupo" },
-  { icon:"🏆", tag:"CONCLUÍDO", title:"Pronto para o Trabalho!", sub:"Onboarding básico concluído", body:"Lembre sempre:\n— Comunicação proativa em cada etapa\n— Respeite velocidades e jornada\n— Cuide do veículo como se fosse seu\n— Ranking elevado = mais prêmios\n— Use o BEN para qualquer dúvida\n\nBem-vindo ao time Bendini!" },
-];
-
-const ONBOARDING_PROG = [
-  { icon:"📋", tag:"BOAS-VINDAS", title:"Bem-vindo à Programação Operacional", sub:"Você agora faz parte do time que move a operação", body:"Como Programador Operacional, você é responsável por planejar, acompanhar e garantir que cada carga chegue certinho ao destino — dentro do prazo, com a documentação correta e seguindo as regras de cada cliente.\n\nEste treinamento vai te dar a base necessária antes de você começar a operar no dia a dia." },
-  { icon:"🏢", tag:"A EMPRESA", title:"Quem é a Bendini Logística", sub:"Conheça a empresa que você representa", body:"A Bendini Logística é uma transportadora com operação nacional e internacional, especializada em cargas gerais e produtos químicos.\n\nTrabalhamos com certificação ISO 9001:2015, somos avaliados pelo SASSMAQ e fazemos parte do Programa OEA (Operador Econômico Autorizado) da Receita Federal — isso significa que seguimos padrões rígidos de segurança, qualidade e conformidade em tudo que fazemos." },
-  { icon:"🧭", tag:"SEU PAPEL", title:"O que faz um Programador Operacional", sub:"Suas principais responsabilidades", body:"— Pré-roteirizar e agendar veículos conforme a necessidade do cliente\n— Atualizar o status das viagens em tempo real (Pendente, Disponível, Em Viagem, Declinado)\n— Selecionar veículos próprios ou de terceiros (agregados)\n— Emitir e conferir documentação de viagem (CT-e, CRT-e, MIC)\n— Garantir que toda a documentação exigida pelo cliente está correta\n— Identificar e tratar qualquer suspeita ou irregularidade na carga" },
-  { icon:"💻", tag:"FERRAMENTAS", title:"Sistemas do Dia a Dia", sub:"As plataformas que você vai usar", body:"ESCALASOFT: nosso ERP — é onde você programa viagens, lança documentos, faz acertos e acompanha tudo.\n\nCELOG (Datatransp): sistema onde lançamos o pedido de carga.\n\n8QUALI: sistema da Qualidade — guarda as Instruções de Trabalho (IT), documentos externos e ocorrências (RAM).\n\nSISCOMEX: sistema da Receita Federal usado em operações de comércio exterior." },
-  { icon:"📄", tag:"DOCUMENTOS", title:"Entendendo os Códigos de Documentos", sub:"PO, IT, RQ e FL — o que cada um significa", body:"PO (Procedimento Operacional): o documento teórico, explica COMO um processo deve funcionar.\n\nIT (Instrução de Trabalho): o passo a passo prático, geralmente com telas do sistema, ensinando EXATAMENTE como fazer algo.\n\nRQ (Registro da Qualidade): documentos e formulários que comprovam que uma atividade foi realizada (ex: checklist preenchido).\n\nFL (Fluxograma): mostra visualmente o caminho de um processo, do início ao fim." },
-  { icon:"🚦", tag:"VIAGENS", title:"Status das Viagens", sub:"Entenda o ciclo de vida de uma viagem", body:"PENDENTE: nenhuma ação foi tomada ainda.\n\nDISPONÍVEL: o veículo está pronto para ser enviado.\n\nEM VIAGEM: o veículo está liberado e em trânsito.\n\nCARREGAMENTO DECLINADO: a viagem foi cancelada. Se o cliente avisar com menos de 6 horas de antecedência, é cobrada a taxa NOSHOW.\n\nVocê deve manter o status sempre atualizado — o cliente recebe a previsão de chegada automaticamente a cada 4 horas." },
-  { icon:"🚛", tag:"FROTA E TERCEIROS", title:"Veículos Próprios e Agregados", sub:"Quando não há frota própria disponível", body:"Quando a frota própria não está disponível, consultamos motoristas terceiros (chamados de Agregados).\n\nAntes de aprovar um terceiro, sempre é feito:\n— Consulta na gerenciadora de risco\n— Checklist visual do veículo (RQ 06 031)\n— Checklist do equipamento de rastreamento\n\nSó depois de aprovado o veículo fica disponível para você programar o carregamento." },
-  { icon:"⚠️", tag:"PRODUTOS QUÍMICOS", title:"Cuidado Redobrado com Químicos", sub:"Regras especiais que você precisa conhecer", body:"Cargas de produtos químicos exigem documentação extra: Ficha de Emergência, painéis de segurança e rótulos de risco no veículo.\n\nA Bendini transporta praticamente todas as classes de produtos perigosos, EXCETO explosivos (classe 1) e radioativos (classe 7).\n\nAntes de qualquer carregamento químico, o veículo passa por um checklist completo: EPIs, kit de emergência, extintor, sinalização e mais." },
-  { icon:"🌎", tag:"INTERNACIONAL", title:"Viagens Internacionais", sub:"Documentação para cruzar fronteiras", body:"Em viagens internacionais, o cliente envia a Fatura e o Packing List antecipadamente para a emissão da documentação.\n\nVocê, como programador, é responsável por fazer uma inspeção cuidadosa dessa documentação, identificando qualquer informação suspeita: valores incompatíveis, pesos divergentes, descrições estranhas.\n\nDocumentos como CRT, MIC e DUE são obrigatórios, e o checklist de 17 pontos se aplica a toda carga internacional." },
-  { icon:"📱", tag:"COMUNICAÇÃO", title:"Como Nos Comunicamos", sub:"Canais oficiais da operação", body:"Grupos de WhatsApp são essenciais: 'Gestão de Frotas' para necessidades de manutenção e status de viagem, e grupos específicos por cliente quando aplicável.\n\nO Follow-Up é enviado todo dia ao cliente, podendo ser automático ou personalizado.\n\nQualquer suspeita, irregularidade ou problema deve ser comunicado IMEDIATAMENTE ao responsável — nunca guarde uma dúvida de segurança para depois." },
-  { icon:"🤖", tag:"AGENTE BEN", title:"Como Usar Esta Plataforma", sub:"Seu assistente do dia a dia", body:"Aba Assistente IA: tire dúvidas a qualquer momento sobre regras internas ou de clientes específicos. É só perguntar — o BEN responde com base nos procedimentos cadastrados.\n\nAba Quiz: valide seu conhecimento respondendo os quizzes de cada procedimento. Você pode revisar os erros depois de cada tentativa.\n\nBotão 💡 Sugerir Regra: se você notar que falta algum procedimento na base, sugira! Seu gestor vai analisar e pode aprovar a inclusão." },
-  { icon:"🚦", tag:"REGRAS GERAIS", title:"Velocidade, Lacre e Pernoite", sub:"Regras de segurança que valem para toda operação", body:"VELOCIDADE: 5 km/h dentro do bairro da Bendini, e máximo de 90 km/h em viagem para qualquer cliente.\\n\\nPERNOITE: o veículo NUNCA pode pernoitar em frente à casa do motorista — isso anula o seguro da carga.\\n\\nLACRE: todo carregamento deve sair lacrado.\\n\\nPALLETS: mercadoria em pallets com sacaria precisa de cintas em todos os pallets, reforçadas nos primeiros e últimos.\\n\\nPOLIETILENO: só pode ser carregado por veículos agregados." },
-  { icon:"💰", tag:"REGRAS GERAIS", title:"Pagamentos, Diárias e Avarias", sub:"Como tratar dinheiro e ocorrências no dia a dia", body:"PAGAMENTO POR CHEQUE: sempre copiar e assinar o cheque, anexando ao processo.\\n\\nDIÁRIAS: avise o comercial sempre que ocorrerem. O pagamento ao terceiro só sai depois do faturamento ao cliente.\\n\\nAVARIAS: oriente o motorista a solicitar o TFA e envie escaneado ao cliente — nunca cobre avaria que não foi causada no transporte.\\n\\nOCORRÊNCIAS GRAVES: prejuízo acima de R$ 10.000 exige que um representante da Bendini vá ao local.\\n\\nEMPRÉSTIMO DE EQUIPAMENTO: sempre anote na capa do processo — senão, você é o responsável se não for devolvido." },
-  { icon:"🛡️", tag:"REGRAS GERAIS", title:"Escoltas e Cargas de Alto Valor", sub:"Quando o risco exige cuidado redobrado", body:"ESCOLTA PARA O RJ: obrigatória a partir da divisa SP-RJ, com apresentação 2 horas após o horário de carregamento.\\n\\nCARGAS DE ALTO VALOR EM SC: mercadorias acima de R$ 250.000 em operação nos portos de SC devem ser rastreadas.\\n\\nFINAL DE SEMANA: veículo agregado ou terceiro carregado fica no pátio da Bendini até iniciar a viagem — qualquer lugar diferente precisa de homologação da Gerenciadora de Risco.\\n\\nÁREA ALFANDEGADA: nunca misture mercadorias de processos diferentes dentro do mesmo veículo nessas áreas." },
-  { icon:"🏆", tag:"CONCLUÍDO", title:"Pronto para Começar!", sub:"Onboarding finalizado", body:"Você concluiu o treinamento inicial da Programação Operacional.\n\nAgora é hora de validar seu conhecimento nos Quizzes — cada procedimento tem um quiz específico, e você pode refazer quantas vezes precisar.\n\nLembre-se: o BEN está sempre disponível para tirar dúvidas. Em caso de qualquer incerteza na operação, pergunte antes de agir.\n\nBem-vindo ao time Bendini!" },
-];
-
 // ══════════════════════════════════════════════════
 // LOGIN
 // ══════════════════════════════════════════════════
@@ -314,6 +285,7 @@ function PainelAdm({ onSair }) {
     { id:"regras",       label:"Regras" },
     { id:"oficina",      label:"🔧 Oficina" },
     { id:"prog",         label:"📋 Prog" },
+    { id:"onboarding",   label:"🎓 Onboarding" },
     { id:"inteligencia", label:"Inteligência IA" },
   ];
 
@@ -705,6 +677,11 @@ Taxa de acerto geral: ${respostasData.length > 0 ? ((acertos.length / respostasD
         {/* PROG ADM */}
         {aba === "prog" && (
           <PainelProgAdm showMsg={showMsg} />
+        )}
+
+        {/* ONBOARDING ADM */}
+        {aba === "onboarding" && (
+          <PainelOnboardingAdm showMsg={showMsg} />
         )}
 
         {/* INTELIGÊNCIA IA */}
@@ -1125,6 +1102,7 @@ export default function App() {
   const [quizAtivo, setQuizAtivo] = useState(null);
   const [quizRevisando, setQuizRevisando] = useState(null);
   const [quizzesCount, setQuizzesCount] = useState(0);
+  const [obSlides, setObSlides] = useState([]);
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
@@ -1135,13 +1113,15 @@ export default function App() {
     if (user.perfilAuto) setPerfil(user.perfilAuto);
     setLoadingHist(true);
     try {
-      const [hist, regs, qz, tent] = await Promise.all([
+      const [hist, regs, qz, tent, ob] = await Promise.all([
         sb.get("historico_conversa", `motorista_nome=eq.${encodeURIComponent(user.cpf)}&order=created_at.asc&limit=100`),
         sb.get("regras", "ativo=eq.true&order=ordem.asc"),
         sb.get("quizzes", "status=eq.ativo"),
         sb.get("quiz_tentativas", `motorista_cpf=eq.${user.cpf}`),
+        sb.get("onboarding_slides", "modulo=eq.motorista&ativo=eq.true&order=ordem.asc"),
       ]);
       setRegrasAdm(Array.isArray(regs) ? regs : []);
+      setObSlides(Array.isArray(ob) ? ob : []);
       const quizzesAtivos = Array.isArray(qz) ? qz : [];
       const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
       const pendentes = quizzesAtivos.filter(q => !respondidos.has(q.id)).length;
@@ -1335,28 +1315,33 @@ export default function App() {
         )}
 
         {/* ONBOARDING */}
-        {tab === "onboarding" && (
+        {tab === "onboarding" && obSlides.length === 0 && (
+          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+            <div style={{ color:C.MUTED, fontSize:13 }}>Nenhum conteúdo de onboarding cadastrado ainda.</div>
+          </div>
+        )}
+        {tab === "onboarding" && obSlides.length > 0 && (
           <div style={{ flex:1, overflowY:"auto", padding:20 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
               <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Progresso</span>
-              <span style={{ fontSize:9, color:C.RED, letterSpacing:1, fontWeight:800 }}>{step+1} / {ONBOARDING.length}</span>
+              <span style={{ fontSize:9, color:C.RED, letterSpacing:1, fontWeight:800 }}>{step+1} / {obSlides.length}</span>
             </div>
             <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:20 }}>
-              <div style={{ height:"100%", width:`${((step+1)/ONBOARDING.length)*100}%`, background:C.RED, transition:"width 0.4s", borderRadius:1 }} />
+              <div style={{ height:"100%", width:`${((step+1)/obSlides.length)*100}%`, background:C.RED, transition:"width 0.4s", borderRadius:1 }} />
             </div>
-            <div style={{ display:"flex", gap:5, marginBottom:22 }}>
-              {ONBOARDING.map((_,i) => <div key={i} onClick={() => setStep(i)} style={{ width:i===step?24:8, height:3, background:i<=step?C.RED:C.BORDER2, cursor:"pointer", transition:"all 0.3s", borderRadius:2 }} />)}
+            <div style={{ display:"flex", gap:5, marginBottom:22, flexWrap:"wrap" }}>
+              {obSlides.map((_,i) => <div key={i} onClick={() => setStep(i)} style={{ width:i===step?24:8, height:3, background:i<=step?C.RED:C.BORDER2, cursor:"pointer", transition:"all 0.3s", borderRadius:2 }} />)}
             </div>
             <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"24px 20px", marginBottom:16 }}>
-              <div style={{ fontSize:10, display:"inline-block", background:C.RED, color:C.WHITE, letterSpacing:2, fontWeight:900, padding:"3px 9px", marginBottom:16, textTransform:"uppercase" }}>{ONBOARDING[step].tag}</div>
-              <div style={{ fontSize:28, marginBottom:10 }}>{ONBOARDING[step].icon}</div>
-              <div style={{ fontSize:22, fontWeight:900, color:C.WHITE, marginBottom:6, letterSpacing:-0.5, lineHeight:1.2 }}>{ONBOARDING[step].title}</div>
-              <div style={{ fontSize:11, color:C.MUTED, letterSpacing:1.5, textTransform:"uppercase", fontWeight:700, marginBottom:20 }}>{ONBOARDING[step].sub}</div>
-              <div style={{ fontSize:14, color:C.TEXT, whiteSpace:"pre-line", lineHeight:1.85 }}>{ONBOARDING[step].body}</div>
+              <div style={{ fontSize:10, display:"inline-block", background:C.RED, color:C.WHITE, letterSpacing:2, fontWeight:900, padding:"3px 9px", marginBottom:16, textTransform:"uppercase" }}>{obSlides[step].tag}</div>
+              <div style={{ fontSize:28, marginBottom:10 }}>{obSlides[step].icon}</div>
+              <div style={{ fontSize:22, fontWeight:900, color:C.WHITE, marginBottom:6, letterSpacing:-0.5, lineHeight:1.2 }}>{obSlides[step].title}</div>
+              <div style={{ fontSize:11, color:C.MUTED, letterSpacing:1.5, textTransform:"uppercase", fontWeight:700, marginBottom:20 }}>{obSlides[step].sub}</div>
+              <div style={{ fontSize:14, color:C.TEXT, whiteSpace:"pre-line", lineHeight:1.85 }}>{obSlides[step].body}</div>
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={() => setStep(s => Math.max(0,s-1))} disabled={step===0} style={{ flex:1, padding:"13px", background:"none", border:`1px solid ${step===0?C.BORDER:C.BORDER2}`, borderRadius:2, color:step===0?C.MUTED2:C.MUTED, cursor:step===0?"not-allowed":"pointer", fontWeight:800, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>← Anterior</button>
-              <button onClick={() => setStep(s => Math.min(ONBOARDING.length-1,s+1))} disabled={step===ONBOARDING.length-1} style={{ flex:2, padding:"13px", background:step===ONBOARDING.length-1?C.CARD2:C.RED, border:"none", borderRadius:2, color:step===ONBOARDING.length-1?C.MUTED2:C.WHITE, cursor:step===ONBOARDING.length-1?"not-allowed":"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Próximo →</button>
+              <button onClick={() => setStep(s => Math.min(obSlides.length-1,s+1))} disabled={step===obSlides.length-1} style={{ flex:2, padding:"13px", background:step===obSlides.length-1?C.CARD2:C.RED, border:"none", borderRadius:2, color:step===obSlides.length-1?C.MUTED2:C.WHITE, cursor:step===obSlides.length-1?"not-allowed":"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Próximo →</button>
             </div>
           </div>
         )}
@@ -1443,23 +1428,36 @@ function ModuloOficina({ usuario, onSair }) {
   const [quizAtivo, setQuizAtivo] = useState(null);
   const [quizRevisando, setQuizRevisando] = useState(null);
   const [quizzesCount, setQuizzesCount] = useState(0);
+  const [onboardingDone, setOnboardingDone] = useState(true);
+  const [obStep, setObStep] = useState(0);
+  const [obSlides, setObSlides] = useState([]);
   const endRef = useRef(null);
+  const OC = "#e67e22";
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
   useEffect(() => {
     const init = async () => {
       try {
-        const [hist, regs, qz, tent] = await Promise.all([
+        const [hist, regs, qz, tent, mecReg, ob] = await Promise.all([
           sb.get("oficina_historico", `mecanico_cpf=eq.${encodeURIComponent(usuario.cpf)}&order=created_at.asc&limit=100`),
           sb.get("oficina_regras", "ativo=eq.true&order=ordem.asc"),
           sb.get("oficina_quizzes", "status=eq.ativo"),
           sb.get("oficina_tentativas", `mecanico_cpf=eq.${usuario.cpf}`),
+          sb.get("mecanicos", `cpf=eq.${usuario.cpf}`),
+          sb.get("onboarding_slides", "modulo=eq.oficina&ativo=eq.true&order=ordem.asc"),
         ]);
         setRegras(Array.isArray(regs) ? regs : []);
         const ativos = Array.isArray(qz) ? qz : [];
         const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
         setQuizzesCount(ativos.filter(q => !respondidos.has(q.id)).length);
+
+        setObSlides(Array.isArray(ob) ? ob : []);
+        const mecData = Array.isArray(mecReg) && mecReg.length > 0 ? mecReg[0] : null;
+        const done = mecData?.onboarding_completo === true;
+        setOnboardingDone(done);
+        if (!done && Array.isArray(ob) && ob.length > 0) setTab("onboarding");
+
         if (Array.isArray(hist) && hist.length > 0) {
           setMsgs(hist.map(m => ({ role: m.role, content: m.content })));
         } else {
@@ -1472,6 +1470,12 @@ function ModuloOficina({ usuario, onSair }) {
     };
     init();
   }, []);
+
+  const concluirOnboarding = async () => {
+    try { await sb.patch("mecanicos", `cpf=eq.${usuario.cpf}`, { onboarding_completo: true }); } catch {}
+    setOnboardingDone(true);
+    setTab("chat");
+  };
 
   const buildKnowledge = () => {
     let base = `Você é o BEN, Assistente Oficial da Oficina Bendini Logística — agente de treinamento e suporte para mecânicos. Responda sempre em português brasileiro.\n\nTOM: Técnico, preciso e didático. Fale como um mecânico sênior experiente.\n\n`;
@@ -1502,6 +1506,7 @@ function ModuloOficina({ usuario, onSair }) {
   };
 
   const TABS = [
+    ...(obSlides.length > 0 ? [{ id:"onboarding", label:"Onboarding", badge: !onboardingDone ? "!" : null }] : []),
     { id:"chat", label:"Assistente IA" },
     { id:"quiz", label:"Quiz", badge: quizzesCount > 0 ? quizzesCount : null },
   ];
@@ -1517,8 +1522,6 @@ function ModuloOficina({ usuario, onSair }) {
       <style>{`@keyframes bpulse{0%,80%,100%{transform:scale(0.5);opacity:0.3}40%{transform:scale(1);opacity:1}}`}</style>
     </div>
   );
-
-  const OC = { ...C, RED: "#e67e22", CARD2:"#1a2a1a" }; // laranja para oficina
 
   return (
     <div style={{ minHeight:"100vh", background:C.BG, fontFamily:"'Barlow','Segoe UI',sans-serif", color:C.TEXT, display:"flex", flexDirection:"column" }}>
@@ -1585,14 +1588,58 @@ function ModuloOficina({ usuario, onSair }) {
           </div>
         )}
 
+        {/* ONBOARDING */}
+        {tab === "onboarding" && obSlides.length > 0 && (
+          <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Progresso</span>
+              <span style={{ fontSize:9, color:OC, letterSpacing:1, fontWeight:800 }}>{obStep+1} / {obSlides.length}</span>
+            </div>
+            <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:20 }}>
+              <div style={{ height:"100%", width:`${((obStep+1)/obSlides.length)*100}%`, background:OC, transition:"width 0.4s", borderRadius:1 }} />
+            </div>
+            <div style={{ display:"flex", gap:5, marginBottom:22, flexWrap:"wrap" }}>
+              {obSlides.map((_,i) => <div key={i} onClick={() => setObStep(i)} style={{ width:i===obStep?24:8, height:3, background:i<=obStep?OC:C.BORDER2, cursor:"pointer", transition:"all 0.3s", borderRadius:2 }} />)}
+            </div>
+            <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"24px 20px", marginBottom:16 }}>
+              <div style={{ fontSize:10, display:"inline-block", background:OC, color:C.WHITE, letterSpacing:2, fontWeight:900, padding:"3px 9px", marginBottom:16, textTransform:"uppercase" }}>{obSlides[obStep].tag}</div>
+              <div style={{ fontSize:28, marginBottom:10 }}>{obSlides[obStep].icon}</div>
+              <div style={{ fontSize:22, fontWeight:900, color:C.WHITE, marginBottom:6, letterSpacing:-0.5, lineHeight:1.2 }}>{obSlides[obStep].title}</div>
+              <div style={{ fontSize:11, color:C.MUTED, letterSpacing:1.5, textTransform:"uppercase", fontWeight:700, marginBottom:20 }}>{obSlides[obStep].sub}</div>
+              <div style={{ fontSize:14, color:C.TEXT, whiteSpace:"pre-line", lineHeight:1.85 }}>{obSlides[obStep].body}</div>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => setObStep(s => Math.max(0,s-1))} disabled={obStep===0} style={{ flex:1, padding:"13px", background:"none", border:`1px solid ${obStep===0?C.BORDER:C.BORDER2}`, borderRadius:2, color:obStep===0?C.MUTED2:C.MUTED, cursor:obStep===0?"not-allowed":"pointer", fontWeight:800, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>← Anterior</button>
+              {obStep < obSlides.length - 1 ? (
+                <button onClick={() => setObStep(s => Math.min(obSlides.length-1,s+1))} style={{ flex:2, padding:"13px", background:OC, border:"none", borderRadius:2, color:C.WHITE, cursor:"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Próximo →</button>
+              ) : (
+                <button onClick={concluirOnboarding} style={{ flex:2, padding:"13px", background:OC, border:"none", borderRadius:2, color:C.WHITE, cursor:"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>✓ Concluir Onboarding</button>
+              )}
+            </div>
+            {onboardingDone && (
+              <div style={{ marginTop:16, textAlign:"center", fontSize:11, color:C.GREEN, fontWeight:700 }}>✓ Você já concluiu este onboarding. Pode revisar à vontade.</div>
+            )}
+          </div>
+        )}
+
         {/* QUIZ */}
-        {tab === "quiz" && !quizAtivo && !quizRevisando && (
+        {tab === "quiz" && obSlides.length > 0 && !onboardingDone && (
+          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+            <div style={{ background:C.CARD, border:`1px solid ${OC}`, borderRadius:2, padding:32, textAlign:"center", maxWidth:380 }}>
+              <div style={{ fontSize:32, marginBottom:12 }}>🔒</div>
+              <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:8 }}>Complete o Onboarding primeiro</div>
+              <div style={{ fontSize:13, color:C.MUTED, marginBottom:20, lineHeight:1.6 }}>Antes de responder os quizzes, é necessário concluir o treinamento inicial de onboarding.</div>
+              <button onClick={() => setTab("onboarding")} style={{ background:OC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit", fontWeight:900 }}>Ir para o Onboarding →</button>
+            </div>
+          </div>
+        )}
+        {tab === "quiz" && (obSlides.length === 0 || onboardingDone) && !quizAtivo && !quizRevisando && (
           <ListaQuizzesOficina usuario={usuario} onIniciar={setQuizAtivo} onRevisar={setQuizRevisando} />
         )}
-        {tab === "quiz" && quizAtivo && (
+        {tab === "quiz" && (obSlides.length === 0 || onboardingDone) && quizAtivo && (
           <QuizOficina quiz={quizAtivo} usuario={usuario} onVoltar={() => setQuizAtivo(null)} />
         )}
-        {tab === "quiz" && quizRevisando && (
+        {tab === "quiz" && (obSlides.length === 0 || onboardingDone) && quizRevisando && (
           <RevisaoOficina quiz={quizRevisando} usuario={usuario} onVoltar={() => setQuizRevisando(null)} />
         )}
       </div>
@@ -1937,8 +1984,13 @@ function PainelOficinaAdm({ showMsg }) {
   const [loading, setLoading] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [quizDetalhe, setQuizDetalhe] = useState(null);
+  const [quizView, setQuizView] = useState("respostas");
   const [tentativas, setTentativas] = useState([]);
   const [mecList, setMecList] = useState([]);
+  const [questoes, setQuestoes] = useState([]);
+  const [editandoQuestao, setEditandoQuestao] = useState(null);
+  const [novaQuestao, setNovaQuestao] = useState({ pergunta:"", opcao_a:"", opcao_b:"", opcao_c:"", opcao_d:"", correta:"a", explicacao:"" });
+  const [addingQuestao, setAddingQuestao] = useState(false);
 
   useEffect(() => { carregarOficina(); }, [subAba]);
 
@@ -2018,8 +2070,53 @@ function PainelOficinaAdm({ showMsg }) {
 
   const verDetalheQuiz = async (quiz) => {
     setQuizDetalhe(quiz);
-    const t = await sb.get("oficina_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`);
+    setQuizView("respostas");
+    setEditandoQuestao(null);
+    setAddingQuestao(false);
+    const [t, q] = await Promise.all([
+      sb.get("oficina_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`),
+      sb.get("oficina_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`),
+    ]);
     setTentativas(Array.isArray(t) ? t : []);
+    setQuestoes(Array.isArray(q) ? q : []);
+  };
+
+  const salvarQuestao = async () => {
+    const dados = editandoQuestao || novaQuestao;
+    if (!dados.pergunta.trim()) { showMsg("Digite a pergunta.", C.RED); return; }
+    try {
+      if (editandoQuestao) {
+        await sb.patch("oficina_questoes", `id=eq.${editandoQuestao.id}`, {
+          pergunta: editandoQuestao.pergunta, opcao_a: editandoQuestao.opcao_a,
+          opcao_b: editandoQuestao.opcao_b, opcao_c: editandoQuestao.opcao_c,
+          opcao_d: editandoQuestao.opcao_d, correta: editandoQuestao.correta,
+          explicacao: editandoQuestao.explicacao,
+        });
+        showMsg("Questão atualizada!");
+        setEditandoQuestao(null);
+      } else {
+        await sb.post("oficina_questoes", {
+          quiz_id: quizDetalhe.id, pergunta: novaQuestao.pergunta,
+          opcao_a: novaQuestao.opcao_a, opcao_b: novaQuestao.opcao_b,
+          opcao_c: novaQuestao.opcao_c, opcao_d: novaQuestao.opcao_d,
+          correta: novaQuestao.correta, explicacao: novaQuestao.explicacao,
+          ordem: questoes.length + 1,
+        });
+        showMsg("Questão adicionada!");
+        setNovaQuestao({ pergunta:"", opcao_a:"", opcao_b:"", opcao_c:"", opcao_d:"", correta:"a", explicacao:"" });
+        setAddingQuestao(false);
+      }
+      const q2 = await sb.get("oficina_questoes", `quiz_id=eq.${quizDetalhe.id}&order=ordem.asc`);
+      setQuestoes(Array.isArray(q2) ? q2 : []);
+    } catch { showMsg("Erro ao salvar questão.", C.RED); }
+  };
+
+  const excluirQuestao = async (id) => {
+    if (!window.confirm("Excluir esta questão?")) return;
+    await sb.delete("oficina_questoes", `id=eq.${id}`);
+    showMsg("Questão excluída.");
+    const q = await sb.get("oficina_questoes", `quiz_id=eq.${quizDetalhe.id}&order=ordem.asc`);
+    setQuestoes(Array.isArray(q) ? q : []);
   };
 
   const OC = "#e67e22";
@@ -2098,49 +2195,136 @@ function PainelOficinaAdm({ showMsg }) {
       {subAba === "quizzes" && quizDetalhe && (
         <div>
           <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
-            <button onClick={() => setQuizDetalhe(null)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+            <button onClick={() => { setQuizDetalhe(null); setEditandoQuestao(null); setAddingQuestao(false); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
             <div style={{ flex:1, fontSize:16, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
           </div>
-          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✓ Responderam ({tentativas.length})</div>
-          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
-            {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum mecânico respondeu ainda.</div> :
-              tentativas.map((t, i) => (
-                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.mecanico_nome}</div>
-                    <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.mecanico_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")}</div>
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
-                    <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
-                  </div>
-                </div>
-              ))
-            }
+
+          <div style={{ display:"flex", gap:0, marginBottom:20, background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {[{id:"respostas",label:`📊 Respostas (${tentativas.length})`},{id:"questoes",label:`✏️ Questões (${questoes.length})`}].map(v => (
+              <button key={v.id} onClick={() => { setQuizView(v.id); setEditandoQuestao(null); setAddingQuestao(false); }}
+                style={{ flex:1, padding:"11px 8px", background:quizView===v.id?C.CARD:"none", border:"none", borderBottom:quizView===v.id?`2px solid ${OC}`:"2px solid transparent", color:quizView===v.id?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>
+                {v.label}
+              </button>
+            ))}
           </div>
-          {(() => {
-            const responderam = new Set(tentativas.map(t => t.mecanico_cpf));
-            const pendentes = mecList.filter(m => !responderam.has(m.cpf));
-            return (
-              <>
-                <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✗ Pendentes ({pendentes.length})</div>
-                <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
-                  {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos responderam!</div> :
-                    pendentes.map((m, i) => (
-                      <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                        <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
-                        <div style={{ flex:1 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{m.nome}</div>
-                          <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
-                        </div>
-                        <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+
+          {quizView === "respostas" && (
+            <div>
+              <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✓ Responderam ({tentativas.length})</div>
+              <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
+                {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum mecânico respondeu ainda.</div> :
+                  tentativas.map((t, i) => (
+                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.mecanico_nome}</div>
+                        <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.mecanico_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")}</div>
                       </div>
-                    ))
-                  }
-                </div>
-              </>
-            );
-          })()}
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
+                        <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+              {(() => {
+                const responderam = new Set(tentativas.map(t => t.mecanico_cpf));
+                const pendentes = mecList.filter(m => !responderam.has(m.cpf));
+                return (
+                  <>
+                    <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✗ Pendentes ({pendentes.length})</div>
+                    <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+                      {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos responderam!</div> :
+                        pendentes.map((m, i) => (
+                          <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                            <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{m.nome}</div>
+                              <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
+                            </div>
+                            <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {quizView === "questoes" && (
+            <div>
+              {(editandoQuestao || addingQuestao) && (() => {
+                const q = editandoQuestao || novaQuestao;
+                const setQ = editandoQuestao
+                  ? (field, val) => setEditandoQuestao(p => ({...p, [field]:val}))
+                  : (field, val) => setNovaQuestao(p => ({...p, [field]:val}));
+                return (
+                  <div style={{ background:C.CARD, border:`2px solid ${OC}`, borderRadius:2, padding:20, marginBottom:20 }}>
+                    <div style={{ fontSize:10, color:OC, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
+                      {editandoQuestao ? "✏️ Editar Questão" : "➕ Nova Questão"}
+                    </div>
+                    <textarea value={q.pergunta} onChange={e => setQ("pergunta", e.target.value)} placeholder="Texto da pergunta..." rows={2}
+                      style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:10, resize:"vertical", lineHeight:1.5 }} />
+                    {["a","b","c","d"].map(l => (
+                      <div key={l} style={{ display:"flex", gap:8, alignItems:"center", marginBottom:8 }}>
+                        <div style={{ width:24, height:24, borderRadius:2, background:q.correta===l?OC:C.BORDER2, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.WHITE, flexShrink:0, cursor:"pointer" }}
+                          onClick={() => setQ("correta", l)}>{l.toUpperCase()}</div>
+                        <input value={q[`opcao_${l}`]} onChange={e => setQ(`opcao_${l}`, e.target.value)} placeholder={`Opção ${l.toUpperCase()}`}
+                          style={{ flex:1, background:q.correta===l?"rgba(230,126,34,0.08)":C.NAV, border:`1px solid ${q.correta===l?OC:C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit" }} />
+                        {q.correta===l && <span style={{ fontSize:9, color:OC, fontWeight:900, letterSpacing:1 }}>✓ CORRETA</span>}
+                      </div>
+                    ))}
+                    <textarea value={q.explicacao} onChange={e => setQ("explicacao", e.target.value)} placeholder="Explicação da resposta correta (opcional)..." rows={2}
+                      style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginTop:4, marginBottom:14, resize:"vertical", lineHeight:1.5 }} />
+                    <div style={{ fontSize:11, color:C.MUTED, marginBottom:12 }}>Clique na letra para definir a resposta correta.</div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={salvarQuestao} style={{ background:OC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                        {editandoQuestao ? "Salvar Alteração" : "Adicionar Questão"}
+                      </button>
+                      <button onClick={() => { setEditandoQuestao(null); setAddingQuestao(false); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {!editandoQuestao && !addingQuestao && (
+                <button onClick={() => setAddingQuestao(true)} style={{ background:"none", border:`1px dashed ${OC}`, borderRadius:2, padding:"10px 20px", color:OC, cursor:"pointer", fontSize:10, letterSpacing:2, fontWeight:800, textTransform:"uppercase", fontFamily:"inherit", width:"100%", marginBottom:16 }}>
+                  + Adicionar Nova Questão
+                </button>
+              )}
+
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {questoes.length === 0
+                  ? <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, color:C.MUTED, fontSize:13 }}>Nenhuma questão cadastrada.</div>
+                  : questoes.map((q, i) => (
+                    <div key={q.id} style={{ background:editandoQuestao?.id===q.id?C.CARD2:C.CARD, border:`1px solid ${editandoQuestao?.id===q.id?OC:C.BORDER}`, borderRadius:2, padding:"14px 16px" }}>
+                      <div style={{ display:"flex", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                        <div style={{ fontSize:10, color:C.MUTED, fontWeight:800, letterSpacing:1, minWidth:22, paddingTop:2 }}>#{i+1}</div>
+                        <div style={{ flex:1, fontSize:14, fontWeight:700, color:C.WHITE, lineHeight:1.5 }}>{q.pergunta}</div>
+                        <button onClick={() => { setEditandoQuestao({...q}); setAddingQuestao(false); window.scrollTo(0,0); }}
+                          style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"3px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit", flexShrink:0 }}>Editar</button>
+                        <button onClick={() => excluirQuestao(q.id)}
+                          style={{ background:"none", border:`1px solid rgba(192,57,43,0.4)`, borderRadius:2, padding:"3px 10px", color:C.RED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit", flexShrink:0 }}>Excluir</button>
+                      </div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:6, paddingLeft:32 }}>
+                        {["a","b","c","d"].map(l => (
+                          <div key={l} style={{ padding:"4px 10px", borderRadius:2, background:q.correta===l?"rgba(46,204,113,0.1)":C.NAV, border:`1px solid ${q.correta===l?"#2ecc71":C.BORDER}`, fontSize:12, color:q.correta===l?"#2ecc71":C.MUTED, display:"flex", gap:6, alignItems:"center" }}>
+                            <span style={{ fontWeight:900, fontSize:10 }}>{l.toUpperCase()}.</span> {q[`opcao_${l}`] || "—"}
+                            {q.correta===l && <span style={{ fontSize:9, fontWeight:900 }}>✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                      {q.explicacao && (
+                        <div style={{ marginTop:8, paddingLeft:32, fontSize:12, color:C.MUTED, fontStyle:"italic", lineHeight:1.5 }}>💡 {q.explicacao}</div>
+                      )}
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2209,6 +2393,7 @@ function ModuloProg({ usuario, onSair }) {
   const [msgSugestao, setMsgSugestao] = useState("");
   const [onboardingDone, setOnboardingDone] = useState(true); // assume true até checar no banco
   const [obStep, setObStep] = useState(0);
+  const [obSlides, setObSlides] = useState([]);
   const endRef = useRef(null);
   const PC = "#1a7a4a"; // verde para programadores
 
@@ -2217,13 +2402,15 @@ function ModuloProg({ usuario, onSair }) {
   useEffect(() => {
     const init = async () => {
       try {
-        const [hist, regs, qz, tent, progReg] = await Promise.all([
+        const [hist, regs, qz, tent, progReg, ob] = await Promise.all([
           sb.get("prog_historico", `programador_cpf=eq.${encodeURIComponent(usuario.cpf)}&order=created_at.asc&limit=100`),
           sb.get("prog_regras", "ativo=eq.true&order=ordem.asc"),
           sb.get("prog_quizzes", "status=eq.ativo"),
           sb.get("prog_tentativas", `programador_cpf=eq.${usuario.cpf}`),
           sb.get("programadores", `cpf=eq.${usuario.cpf}`),
+          sb.get("onboarding_slides", "modulo=eq.programador&ativo=eq.true&order=ordem.asc"),
         ]);
+        setObSlides(Array.isArray(ob) ? ob : []);
         setRegras(Array.isArray(regs) ? regs : []);
         const ativos = Array.isArray(qz) ? qz : [];
         const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
@@ -2409,29 +2596,34 @@ function ModuloProg({ usuario, onSair }) {
         )}
 
         {/* ONBOARDING */}
-        {tab === "onboarding" && (
+        {tab === "onboarding" && obSlides.length === 0 && (
+          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+            <div style={{ color:C.MUTED, fontSize:13 }}>Nenhum conteúdo de onboarding cadastrado ainda.</div>
+          </div>
+        )}
+        {tab === "onboarding" && obSlides.length > 0 && (
           <div style={{ flex:1, overflowY:"auto", padding:20 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
               <span style={{ fontSize:9, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>Progresso</span>
-              <span style={{ fontSize:9, color:PC, letterSpacing:1, fontWeight:800 }}>{obStep+1} / {ONBOARDING_PROG.length}</span>
+              <span style={{ fontSize:9, color:PC, letterSpacing:1, fontWeight:800 }}>{obStep+1} / {obSlides.length}</span>
             </div>
             <div style={{ height:2, background:C.BORDER, borderRadius:1, marginBottom:20 }}>
-              <div style={{ height:"100%", width:`${((obStep+1)/ONBOARDING_PROG.length)*100}%`, background:PC, transition:"width 0.4s", borderRadius:1 }} />
+              <div style={{ height:"100%", width:`${((obStep+1)/obSlides.length)*100}%`, background:PC, transition:"width 0.4s", borderRadius:1 }} />
             </div>
             <div style={{ display:"flex", gap:5, marginBottom:22, flexWrap:"wrap" }}>
-              {ONBOARDING_PROG.map((_,i) => <div key={i} onClick={() => setObStep(i)} style={{ width:i===obStep?24:8, height:3, background:i<=obStep?PC:C.BORDER2, cursor:"pointer", transition:"all 0.3s", borderRadius:2 }} />)}
+              {obSlides.map((_,i) => <div key={i} onClick={() => setObStep(i)} style={{ width:i===obStep?24:8, height:3, background:i<=obStep?PC:C.BORDER2, cursor:"pointer", transition:"all 0.3s", borderRadius:2 }} />)}
             </div>
             <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:"24px 20px", marginBottom:16 }}>
-              <div style={{ fontSize:10, display:"inline-block", background:PC, color:C.WHITE, letterSpacing:2, fontWeight:900, padding:"3px 9px", marginBottom:16, textTransform:"uppercase" }}>{ONBOARDING_PROG[obStep].tag}</div>
-              <div style={{ fontSize:28, marginBottom:10 }}>{ONBOARDING_PROG[obStep].icon}</div>
-              <div style={{ fontSize:22, fontWeight:900, color:C.WHITE, marginBottom:6, letterSpacing:-0.5, lineHeight:1.2 }}>{ONBOARDING_PROG[obStep].title}</div>
-              <div style={{ fontSize:11, color:C.MUTED, letterSpacing:1.5, textTransform:"uppercase", fontWeight:700, marginBottom:20 }}>{ONBOARDING_PROG[obStep].sub}</div>
-              <div style={{ fontSize:14, color:C.TEXT, whiteSpace:"pre-line", lineHeight:1.85 }}>{ONBOARDING_PROG[obStep].body}</div>
+              <div style={{ fontSize:10, display:"inline-block", background:PC, color:C.WHITE, letterSpacing:2, fontWeight:900, padding:"3px 9px", marginBottom:16, textTransform:"uppercase" }}>{obSlides[obStep].tag}</div>
+              <div style={{ fontSize:28, marginBottom:10 }}>{obSlides[obStep].icon}</div>
+              <div style={{ fontSize:22, fontWeight:900, color:C.WHITE, marginBottom:6, letterSpacing:-0.5, lineHeight:1.2 }}>{obSlides[obStep].title}</div>
+              <div style={{ fontSize:11, color:C.MUTED, letterSpacing:1.5, textTransform:"uppercase", fontWeight:700, marginBottom:20 }}>{obSlides[obStep].sub}</div>
+              <div style={{ fontSize:14, color:C.TEXT, whiteSpace:"pre-line", lineHeight:1.85 }}>{obSlides[obStep].body}</div>
             </div>
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={() => setObStep(s => Math.max(0,s-1))} disabled={obStep===0} style={{ flex:1, padding:"13px", background:"none", border:`1px solid ${obStep===0?C.BORDER:C.BORDER2}`, borderRadius:2, color:obStep===0?C.MUTED2:C.MUTED, cursor:obStep===0?"not-allowed":"pointer", fontWeight:800, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>← Anterior</button>
-              {obStep < ONBOARDING_PROG.length - 1 ? (
-                <button onClick={() => setObStep(s => Math.min(ONBOARDING_PROG.length-1,s+1))} style={{ flex:2, padding:"13px", background:PC, border:"none", borderRadius:2, color:C.WHITE, cursor:"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Próximo →</button>
+              {obStep < obSlides.length - 1 ? (
+                <button onClick={() => setObStep(s => Math.min(obSlides.length-1,s+1))} style={{ flex:2, padding:"13px", background:PC, border:"none", borderRadius:2, color:C.WHITE, cursor:"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Próximo →</button>
               ) : (
                 <button onClick={concluirOnboarding} style={{ flex:2, padding:"13px", background:PC, border:"none", borderRadius:2, color:C.WHITE, cursor:"pointer", fontWeight:900, fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>✓ Concluir Onboarding</button>
               )}
@@ -2441,6 +2633,7 @@ function ModuloProg({ usuario, onSair }) {
             )}
           </div>
         )}
+
 
         {/* QUIZ */}
         {tab === "quiz" && !onboardingDone && (
@@ -2723,9 +2916,14 @@ function PainelProgAdm({ showMsg }) {
   const [loading, setLoading] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [quizDetalhe, setQuizDetalhe] = useState(null);
+  const [quizView, setQuizView] = useState("respostas");
   const [tentativas, setTentativas] = useState([]);
   const [progList, setProgList] = useState([]);
   const [feedbackRejeitar, setFeedbackRejeitar] = useState({});
+  const [questoes, setQuestoes] = useState([]);
+  const [editandoQuestao, setEditandoQuestao] = useState(null);
+  const [novaQuestao, setNovaQuestao] = useState({ pergunta:"", opcao_a:"", opcao_b:"", opcao_c:"", opcao_d:"", correta:"a", explicacao:"" });
+  const [addingQuestao, setAddingQuestao] = useState(false);
   const PC = "#1a7a4a";
 
   useEffect(() => { carregarProg(); }, [subAba]);
@@ -2819,8 +3017,53 @@ function PainelProgAdm({ showMsg }) {
 
   const verDetalheQuiz = async (quiz) => {
     setQuizDetalhe(quiz);
-    const t = await sb.get("prog_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`);
+    setQuizView("respostas");
+    setEditandoQuestao(null);
+    setAddingQuestao(false);
+    const [t, q] = await Promise.all([
+      sb.get("prog_tentativas", `quiz_id=eq.${quiz.id}&order=created_at.desc`),
+      sb.get("prog_questoes", `quiz_id=eq.${quiz.id}&order=ordem.asc`),
+    ]);
     setTentativas(Array.isArray(t)?t:[]);
+    setQuestoes(Array.isArray(q) ? q : []);
+  };
+
+  const salvarQuestao = async () => {
+    const dados = editandoQuestao || novaQuestao;
+    if (!dados.pergunta.trim()) { showMsg("Digite a pergunta.", C.RED); return; }
+    try {
+      if (editandoQuestao) {
+        await sb.patch("prog_questoes", `id=eq.${editandoQuestao.id}`, {
+          pergunta: editandoQuestao.pergunta, opcao_a: editandoQuestao.opcao_a,
+          opcao_b: editandoQuestao.opcao_b, opcao_c: editandoQuestao.opcao_c,
+          opcao_d: editandoQuestao.opcao_d, correta: editandoQuestao.correta,
+          explicacao: editandoQuestao.explicacao,
+        });
+        showMsg("Questão atualizada!");
+        setEditandoQuestao(null);
+      } else {
+        await sb.post("prog_questoes", {
+          quiz_id: quizDetalhe.id, pergunta: novaQuestao.pergunta,
+          opcao_a: novaQuestao.opcao_a, opcao_b: novaQuestao.opcao_b,
+          opcao_c: novaQuestao.opcao_c, opcao_d: novaQuestao.opcao_d,
+          correta: novaQuestao.correta, explicacao: novaQuestao.explicacao,
+          ordem: questoes.length + 1,
+        });
+        showMsg("Questão adicionada!");
+        setNovaQuestao({ pergunta:"", opcao_a:"", opcao_b:"", opcao_c:"", opcao_d:"", correta:"a", explicacao:"" });
+        setAddingQuestao(false);
+      }
+      const q2 = await sb.get("prog_questoes", `quiz_id=eq.${quizDetalhe.id}&order=ordem.asc`);
+      setQuestoes(Array.isArray(q2) ? q2 : []);
+    } catch { showMsg("Erro ao salvar questão.", C.RED); }
+  };
+
+  const excluirQuestao = async (id) => {
+    if (!window.confirm("Excluir esta questão?")) return;
+    await sb.delete("prog_questoes", `id=eq.${id}`);
+    showMsg("Questão excluída.");
+    const q = await sb.get("prog_questoes", `quiz_id=eq.${quizDetalhe.id}&order=ordem.asc`);
+    setQuestoes(Array.isArray(q) ? q : []);
   };
 
   const SUBS = [
@@ -2936,44 +3179,131 @@ function PainelProgAdm({ showMsg }) {
       {subAba === "quizzes" && quizDetalhe && (
         <div>
           <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
-            <button onClick={() => setQuizDetalhe(null)} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
+            <button onClick={() => { setQuizDetalhe(null); setEditandoQuestao(null); setAddingQuestao(false); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"6px 14px", color:C.MUTED, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>← Voltar</button>
             <div style={{ flex:1, fontSize:16, fontWeight:900, color:C.WHITE }}>{quizDetalhe.titulo}</div>
           </div>
-          <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✓ Responderam ({tentativas.length})</div>
-          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
-            {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum programador respondeu ainda.</div> :
-              tentativas.map((t, i) => (
-                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.programador_nome}</div>
-                    <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.programador_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")}</div>
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
-                    <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
-                  </div>
-                </div>
-              ))
-            }
+
+          <div style={{ display:"flex", gap:0, marginBottom:20, background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {[{id:"respostas",label:`📊 Respostas (${tentativas.length})`},{id:"questoes",label:`✏️ Questões (${questoes.length})`}].map(v => (
+              <button key={v.id} onClick={() => { setQuizView(v.id); setEditandoQuestao(null); setAddingQuestao(false); }}
+                style={{ flex:1, padding:"11px 8px", background:quizView===v.id?C.CARD:"none", border:"none", borderBottom:quizView===v.id?`2px solid ${PC}`:"2px solid transparent", color:quizView===v.id?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>
+                {v.label}
+              </button>
+            ))}
           </div>
-          {(() => {
-            const responderam = new Set(tentativas.map(t => t.programador_cpf));
-            const pendentes = progList.filter(p => !responderam.has(p.cpf));
-            return (<>
-              <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✗ Pendentes ({pendentes.length})</div>
-              <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
-                {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos responderam!</div> :
-                  pendentes.map((p, i) => (
-                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
-                      <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
-                      <div style={{ flex:1 }}><div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{p.nome}</div><div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(p.cpf)}</div></div>
-                      <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+
+          {quizView === "respostas" && (
+            <div>
+              <div style={{ fontSize:10, color:C.GREEN, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✓ Responderam ({tentativas.length})</div>
+              <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden", marginBottom:16 }}>
+                {tentativas.length === 0 ? <div style={{ padding:16, color:C.MUTED, fontSize:13 }}>Nenhum programador respondeu ainda.</div> :
+                  tentativas.map((t, i) => (
+                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderBottom:i<tentativas.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{t.programador_nome}</div>
+                        <div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(t.programador_cpf)} — {new Date(t.created_at).toLocaleDateString("pt-BR")}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:16, fontWeight:900, color:t.percentual>=80?C.GREEN:t.percentual>=60?C.YELLOW:C.RED }}>{Number(t.percentual).toFixed(0)}%</div>
+                        <div style={{ fontSize:10, color:C.MUTED }}>{t.score}/{t.total}</div>
+                      </div>
                     </div>
                   ))
                 }
               </div>
-            </>);
-          })()}
+              {(() => {
+                const responderam = new Set(tentativas.map(t => t.programador_cpf));
+                const pendentes = progList.filter(p => !responderam.has(p.cpf));
+                return (<>
+                  <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>✗ Pendentes ({pendentes.length})</div>
+                  <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+                    {pendentes.length === 0 ? <div style={{ padding:16, color:C.GREEN, fontSize:13, fontWeight:700 }}>✓ Todos responderam!</div> :
+                      pendentes.map((p, i) => (
+                        <div key={p.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom:i<pendentes.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                          <div style={{ width:8, height:8, borderRadius:"50%", background:C.RED, flexShrink:0 }} />
+                          <div style={{ flex:1 }}><div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{p.nome}</div><div style={{ fontSize:11, color:C.MUTED }}>{formatCPF(p.cpf)}</div></div>
+                          <div style={{ fontSize:9, color:C.RED, fontWeight:800, letterSpacing:1.5, textTransform:"uppercase" }}>Pendente</div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </>);
+              })()}
+            </div>
+          )}
+
+          {quizView === "questoes" && (
+            <div>
+              {(editandoQuestao || addingQuestao) && (() => {
+                const q = editandoQuestao || novaQuestao;
+                const setQ = editandoQuestao
+                  ? (field, val) => setEditandoQuestao(p => ({...p, [field]:val}))
+                  : (field, val) => setNovaQuestao(p => ({...p, [field]:val}));
+                return (
+                  <div style={{ background:C.CARD, border:`2px solid ${PC}`, borderRadius:2, padding:20, marginBottom:20 }}>
+                    <div style={{ fontSize:10, color:PC, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
+                      {editandoQuestao ? "✏️ Editar Questão" : "➕ Nova Questão"}
+                    </div>
+                    <textarea value={q.pergunta} onChange={e => setQ("pergunta", e.target.value)} placeholder="Texto da pergunta..." rows={2}
+                      style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", marginBottom:10, resize:"vertical", lineHeight:1.5 }} />
+                    {["a","b","c","d"].map(l => (
+                      <div key={l} style={{ display:"flex", gap:8, alignItems:"center", marginBottom:8 }}>
+                        <div style={{ width:24, height:24, borderRadius:2, background:q.correta===l?PC:C.BORDER2, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.WHITE, flexShrink:0, cursor:"pointer" }}
+                          onClick={() => setQ("correta", l)}>{l.toUpperCase()}</div>
+                        <input value={q[`opcao_${l}`]} onChange={e => setQ(`opcao_${l}`, e.target.value)} placeholder={`Opção ${l.toUpperCase()}`}
+                          style={{ flex:1, background:q.correta===l?"rgba(26,122,74,0.08)":C.NAV, border:`1px solid ${q.correta===l?PC:C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit" }} />
+                        {q.correta===l && <span style={{ fontSize:9, color:PC, fontWeight:900, letterSpacing:1 }}>✓ CORRETA</span>}
+                      </div>
+                    ))}
+                    <textarea value={q.explicacao} onChange={e => setQ("explicacao", e.target.value)} placeholder="Explicação da resposta correta (opcional)..." rows={2}
+                      style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginTop:4, marginBottom:14, resize:"vertical", lineHeight:1.5 }} />
+                    <div style={{ fontSize:11, color:C.MUTED, marginBottom:12 }}>Clique na letra para definir a resposta correta.</div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={salvarQuestao} style={{ background:PC, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                        {editandoQuestao ? "Salvar Alteração" : "Adicionar Questão"}
+                      </button>
+                      <button onClick={() => { setEditandoQuestao(null); setAddingQuestao(false); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {!editandoQuestao && !addingQuestao && (
+                <button onClick={() => setAddingQuestao(true)} style={{ background:"none", border:`1px dashed ${PC}`, borderRadius:2, padding:"10px 20px", color:PC, cursor:"pointer", fontSize:10, letterSpacing:2, fontWeight:800, textTransform:"uppercase", fontFamily:"inherit", width:"100%", marginBottom:16 }}>
+                  + Adicionar Nova Questão
+                </button>
+              )}
+
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {questoes.length === 0
+                  ? <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, color:C.MUTED, fontSize:13 }}>Nenhuma questão cadastrada.</div>
+                  : questoes.map((q, i) => (
+                    <div key={q.id} style={{ background:editandoQuestao?.id===q.id?C.CARD2:C.CARD, border:`1px solid ${editandoQuestao?.id===q.id?PC:C.BORDER}`, borderRadius:2, padding:"14px 16px" }}>
+                      <div style={{ display:"flex", alignItems:"flex-start", gap:10, marginBottom:10 }}>
+                        <div style={{ fontSize:10, color:C.MUTED, fontWeight:800, letterSpacing:1, minWidth:22, paddingTop:2 }}>#{i+1}</div>
+                        <div style={{ flex:1, fontSize:14, fontWeight:700, color:C.WHITE, lineHeight:1.5 }}>{q.pergunta}</div>
+                        <button onClick={() => { setEditandoQuestao({...q}); setAddingQuestao(false); window.scrollTo(0,0); }}
+                          style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"3px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit", flexShrink:0 }}>Editar</button>
+                        <button onClick={() => excluirQuestao(q.id)}
+                          style={{ background:"none", border:`1px solid rgba(192,57,43,0.4)`, borderRadius:2, padding:"3px 10px", color:C.RED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit", flexShrink:0 }}>Excluir</button>
+                      </div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:6, paddingLeft:32 }}>
+                        {["a","b","c","d"].map(l => (
+                          <div key={l} style={{ padding:"4px 10px", borderRadius:2, background:q.correta===l?"rgba(46,204,113,0.1)":C.NAV, border:`1px solid ${q.correta===l?"#2ecc71":C.BORDER}`, fontSize:12, color:q.correta===l?"#2ecc71":C.MUTED, display:"flex", gap:6, alignItems:"center" }}>
+                            <span style={{ fontWeight:900, fontSize:10 }}>{l.toUpperCase()}.</span> {q[`opcao_${l}`] || "—"}
+                            {q.correta===l && <span style={{ fontSize:9, fontWeight:900 }}>✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                      {q.explicacao && (
+                        <div style={{ marginTop:8, paddingLeft:32, fontSize:12, color:C.MUTED, fontStyle:"italic", lineHeight:1.5 }}>💡 {q.explicacao}</div>
+                      )}
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3015,6 +3345,173 @@ function PainelProgAdm({ showMsg }) {
           }
         </div>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// PAINEL ADM — EDITOR DE ONBOARDING (todos os módulos)
+// ══════════════════════════════════════════════════
+function PainelOnboardingAdm({ showMsg }) {
+  const [modulo, setModulo] = useState("motorista");
+  const [slides, setSlides] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editando, setEditando] = useState(null); // null | slide obj
+  const [novoSlide, setNovoSlide] = useState({ icon:"📋", tag:"", title:"", sub:"", body:"" });
+  const [adding, setAdding] = useState(false);
+
+  const MODULOS = [
+    { id:"motorista",   label:"🚛 Motoristas",     cor:C.RED },
+    { id:"oficina",     label:"🔧 Oficina",         cor:"#e67e22" },
+    { id:"programador", label:"📋 Programadores",   cor:"#1a7a4a" },
+  ];
+  const corAtual = MODULOS.find(m => m.id === modulo)?.cor || C.RED;
+
+  useEffect(() => { carregar(); }, [modulo]);
+
+  const carregar = async () => {
+    setLoading(true);
+    try {
+      const d = await sb.get("onboarding_slides", `modulo=eq.${modulo}&order=ordem.asc`);
+      setSlides(Array.isArray(d) ? d : []);
+    } catch {}
+    setLoading(false);
+  };
+
+  const salvarSlide = async () => {
+    const dados = editando || novoSlide;
+    if (!dados.title.trim() || !dados.body.trim()) { showMsg("Preencha pelo menos título e conteúdo.", C.RED); return; }
+    try {
+      if (editando) {
+        await sb.patch("onboarding_slides", `id=eq.${editando.id}`, {
+          icon: editando.icon, tag: editando.tag, title: editando.title,
+          sub: editando.sub, body: editando.body,
+        });
+        showMsg("Slide atualizado!");
+        setEditando(null);
+      } else {
+        const maxOrdem = slides.length > 0 ? Math.max(...slides.map(s => s.ordem || 0)) : 0;
+        await sb.post("onboarding_slides", {
+          modulo, ordem: maxOrdem + 1,
+          icon: novoSlide.icon || "📋", tag: novoSlide.tag, title: novoSlide.title,
+          sub: novoSlide.sub, body: novoSlide.body, ativo: true,
+        });
+        showMsg("Slide adicionado!");
+        setNovoSlide({ icon:"📋", tag:"", title:"", sub:"", body:"" });
+        setAdding(false);
+      }
+      carregar();
+    } catch { showMsg("Erro ao salvar slide.", C.RED); }
+  };
+
+  const excluirSlide = async (id) => {
+    if (!window.confirm("Excluir este slide do onboarding?")) return;
+    await sb.delete("onboarding_slides", `id=eq.${id}`);
+    showMsg("Slide excluído.");
+    carregar();
+  };
+
+  const mover = async (index, direcao) => {
+    const alvo = index + direcao;
+    if (alvo < 0 || alvo >= slides.length) return;
+    const a = slides[index], b = slides[alvo];
+    await Promise.all([
+      sb.patch("onboarding_slides", `id=eq.${a.id}`, { ordem: b.ordem }),
+      sb.patch("onboarding_slides", `id=eq.${b.id}`, { ordem: a.ordem }),
+    ]);
+    carregar();
+  };
+
+  return (
+    <div>
+      {/* Seletor de módulo */}
+      <div style={{ display:"flex", gap:0, marginBottom:20, background:C.NAV, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+        {MODULOS.map(m => (
+          <button key={m.id} onClick={() => { setModulo(m.id); setEditando(null); setAdding(false); }}
+            style={{ flex:1, padding:"11px 8px", background:modulo===m.id?C.CARD:"none", border:"none", borderBottom:modulo===m.id?`2px solid ${m.cor}`:"2px solid transparent", color:modulo===m.id?C.WHITE:C.MUTED, cursor:"pointer", fontSize:10, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:16 }}>
+        {slides.length} slide{slides.length !== 1 ? "s" : ""} cadastrado{slides.length !== 1 ? "s" : ""}
+      </div>
+
+      {/* Formulário de edição/adição */}
+      {(editando || adding) && (() => {
+        const s = editando || novoSlide;
+        const setS = editando
+          ? (field, val) => setEditando(p => ({...p, [field]:val}))
+          : (field, val) => setNovoSlide(p => ({...p, [field]:val}));
+        return (
+          <div style={{ background:C.CARD, border:`2px solid ${corAtual}`, borderRadius:2, padding:20, marginBottom:20 }}>
+            <div style={{ fontSize:10, color:corAtual, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
+              {editando ? "✏️ Editar Slide" : "➕ Novo Slide"}
+            </div>
+            <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+              <input value={s.icon} onChange={e => setS("icon", e.target.value)} placeholder="🚛"
+                style={{ width:60, background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:20, outline:"none", fontFamily:"inherit", textAlign:"center" }} />
+              <input value={s.tag} onChange={e => setS("tag", e.target.value)} placeholder="TAG (ex: BOAS-VINDAS)"
+                style={{ flex:1, background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", textTransform:"uppercase" }} />
+            </div>
+            <input value={s.title} onChange={e => setS("title", e.target.value)} placeholder="Título do slide"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:15, fontWeight:700, outline:"none", fontFamily:"inherit", marginBottom:8 }} />
+            <input value={s.sub} onChange={e => setS("sub", e.target.value)} placeholder="Subtítulo (linha de apoio)"
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginBottom:8 }} />
+            <textarea value={s.body} onChange={e => setS("body", e.target.value)} placeholder="Conteúdo do slide... (use quebras de linha para separar parágrafos)" rows={6}
+              style={{ width:"100%", background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"10px 12px", color:C.WHITE, fontSize:13, outline:"none", fontFamily:"inherit", marginBottom:14, resize:"vertical", lineHeight:1.6 }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={salvarSlide} style={{ background:corAtual, border:"none", borderRadius:2, padding:"11px 20px", color:C.WHITE, fontWeight:900, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+                {editando ? "Salvar Alteração" : "Adicionar Slide"}
+              </button>
+              <button onClick={() => { setEditando(null); setAdding(false); }} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"11px 16px", color:C.MUTED, cursor:"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>Cancelar</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {!editando && !adding && (
+        <button onClick={() => setAdding(true)} style={{ background:"none", border:`1px dashed ${corAtual}`, borderRadius:2, padding:"10px 20px", color:corAtual, cursor:"pointer", fontSize:10, letterSpacing:2, fontWeight:800, textTransform:"uppercase", fontFamily:"inherit", width:"100%", marginBottom:16 }}>
+          + Adicionar Novo Slide
+        </button>
+      )}
+
+      {/* Lista de slides */}
+      {loading ? <div style={{ padding:20, color:C.MUTED }}>Carregando...</div> :
+        slides.length === 0 ? (
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:24, textAlign:"center", color:C.MUTED, fontSize:13 }}>
+            Nenhum slide cadastrado para este módulo ainda.
+            {modulo === "oficina" && " A aba de Onboarding só aparece para o mecânico quando houver pelo menos 1 slide."}
+          </div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {slides.map((s, i) => (
+              <div key={s.id} style={{ background:editando?.id===s.id?C.CARD2:C.CARD, border:`1px solid ${editando?.id===s.id?corAtual:C.BORDER}`, borderRadius:2, padding:"14px 16px" }}>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+                  <div style={{ display:"flex", flexDirection:"column", gap:2, flexShrink:0 }}>
+                    <button onClick={() => mover(i, -1)} disabled={i===0} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, width:22, height:18, color:i===0?C.MUTED2:C.MUTED, cursor:i===0?"not-allowed":"pointer", fontSize:10, display:"flex", alignItems:"center", justifyContent:"center" }}>▲</button>
+                    <button onClick={() => mover(i, 1)} disabled={i===slides.length-1} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, width:22, height:18, color:i===slides.length-1?C.MUTED2:C.MUTED, cursor:i===slides.length-1?"not-allowed":"pointer", fontSize:10, display:"flex", alignItems:"center", justifyContent:"center" }}>▼</button>
+                  </div>
+                  <div style={{ fontSize:20, flexShrink:0 }}>{s.icon}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:9, color:corAtual, fontWeight:900, letterSpacing:1.5, textTransform:"uppercase", marginBottom:3 }}>#{i+1} · {s.tag}</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.WHITE, marginBottom:2 }}>{s.title}</div>
+                    <div style={{ fontSize:11, color:C.MUTED, marginBottom:6 }}>{s.sub}</div>
+                    <div style={{ fontSize:12, color:C.MUTED, lineHeight:1.6, whiteSpace:"pre-line", maxHeight:60, overflow:"hidden" }}>{s.body}</div>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:6, flexShrink:0 }}>
+                    <button onClick={() => { setEditando({...s}); setAdding(false); window.scrollTo(0,0); }}
+                      style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"3px 10px", color:C.MUTED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>Editar</button>
+                    <button onClick={() => excluirSlide(s.id)}
+                      style={{ background:"none", border:`1px solid rgba(192,57,43,0.4)`, borderRadius:2, padding:"3px 10px", color:C.RED, cursor:"pointer", fontSize:9, fontWeight:700, letterSpacing:1, textTransform:"uppercase", fontFamily:"inherit" }}>Excluir</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      }
     </div>
   );
 }
