@@ -1165,6 +1165,14 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const limparHistorico = async () => {
+    if (!window.confirm("Limpar todo o histórico de conversa? Essa ação não pode ser desfeita.")) return;
+    try {
+      await sb.delete("historico_conversa", `motorista_nome=eq.${usuario.cpf}`);
+      setMsgs([{ role:"assistant", content:`Histórico limpo! Como posso ajudar, **${usuario.nome}**?` }]);
+    } catch { alert("Erro ao limpar histórico."); }
+  };
+
   const send = async () => {
     if ((!input.trim() && !imagemBase64) || loading) return;
     const txt = input.trim() || "O que você vê nessa imagem? Me ajude com isso.";
@@ -1267,6 +1275,11 @@ export default function App() {
         {tab === "chat" && (
           <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
             <div style={{ flex:1, overflowY:"auto", padding:"20px 16px", display:"flex", flexDirection:"column", gap:16 }}>
+              {msgs.length > 2 && (
+                <div style={{ display:"flex", justifyContent:"center" }}>
+                  <button onClick={limparHistorico} style={{ background:"none", border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"4px 12px", color:C.MUTED2, cursor:"pointer", fontSize:9, letterSpacing:1.5, fontWeight:700, textTransform:"uppercase", fontFamily:"inherit" }}>🗑 Limpar histórico</button>
+                </div>
+              )}
               {msgs.map((m, i) => (
                 <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", gap:10, alignItems:"flex-end" }}>
                   {m.role==="assistant" && <div style={{ width:32, height:32, borderRadius:2, background:C.RED, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.WHITE, flexShrink:0 }}>BEN</div>}
