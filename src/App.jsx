@@ -3557,12 +3557,14 @@ function RankingMotorista({ usuario, fotoUrl, setFotoUrl }) {
   const carregarRanking = async () => {
     setLoading(true);
     try {
-      const [motoristas, tentativas, quizzes, perfData] = await Promise.all([
+      const [motoristas, tentativas, quizzes] = await Promise.all([
         sb.get("motoristas", "ativo=eq.true&order=nome.asc"),
         sb.get("quiz_tentativas", "order=created_at.desc"),
         sb.get("quizzes", "status=eq.ativo"),
-        sb.get("ranking_performance", "order=created_at.desc"),
       ]);
+      // busca separada para não quebrar se a tabela ainda não existir
+      let perfData = [];
+      try { perfData = await sb.get("ranking_performance", "order=created_at.desc"); } catch {}
 
       const mots = Array.isArray(motoristas) ? motoristas : [];
       const tents = Array.isArray(tentativas) ? tentativas : [];
