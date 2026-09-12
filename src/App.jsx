@@ -283,6 +283,7 @@ function PainelAdm({ onSair }) {
     { id:"motoristas",   label:"Motoristas" },
     { id:"quizzes",      label:"Quizzes" },
     { id:"regras",       label:"Regras" },
+    { id:"performance",  label:"📊 Performance" },
     { id:"oficina",      label:"🔧 Oficina" },
     { id:"prog",         label:"📋 Prog" },
     { id:"onboarding",   label:"🎓 Onboarding" },
@@ -667,6 +668,11 @@ Taxa de acerto geral: ${respostasData.length > 0 ? ((acertos.length / respostasD
               }
             </div>
           </div>
+        )}
+
+        {/* PERFORMANCE ADM */}
+        {aba === "performance" && (
+          <PainelPerformanceAdm showMsg={showMsg} />
         )}
 
         {/* OFICINA ADM */}
@@ -1086,9 +1092,7 @@ export default function App() {
   const [usuario, setUsuario] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [isAdm, setIsAdm] = useState(false);
-  const [tab, setTab] = useState("chat");
-  const [msgs, setMsgs] = useState([]);
-  const [loadingHist, setLoadingHist] = useState(false);
+  const [tab, setTab] = useState("ranking");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [regrasAdm, setRegrasAdm] = useState([]);
@@ -3553,45 +3557,76 @@ function RankingMotorista({ usuario, fotoUrl, setFotoUrl }) {
   const carregarRanking = async () => {
     setLoading(true);
     try {
-      const [motoristas, tentativas, quizzes] = await Promise.all([
+      const [motoristas, tentativas, quizzes, perfData] = await Promise.all([
         sb.get("motoristas", "ativo=eq.true&order=nome.asc"),
         sb.get("quiz_tentativas", "order=created_at.desc"),
         sb.get("quizzes", "status=eq.ativo"),
+        sb.get("ranking_performance", "order=created_at.desc"),
       ]);
 
       const mots = Array.isArray(motoristas) ? motoristas : [];
       const tents = Array.isArray(tentativas) ? tentativas : [];
+      const perf = Array.isArray(perfData) ? perfData : [];
       const totalQuizzes = Array.isArray(quizzes) ? quizzes.length : 1;
 
-      // Agrupa tentativas por motorista — usa só a melhor tentativa de cada quiz
-      const pontos = {};
-      mots.forEach(m => {
-        pontos[m.cpf] = { nome: m.nome, cpf: m.cpf, foto: m.foto || null, melhores: {} };
-      });
-
-      tents.forEach(t => {
-        if (!pontos[t.motorista_cpf]) return;
-        const atual = pontos[t.motorista_cpf].melhores[t.quiz_id];
-        if (!atual || t.percentual > atual) {
-          pontos[t.motorista_cpf].melhores[t.quiz_id] = t.percentual;
+      // Pega a nota de performance mais recente por motorista
+      const notaPerf = {};
+      const periodoAtual = {};
+      perf.forEach(p => {
+        if (!notaPerf[p.cpf]) {
+          notaPerf[p.cpf] = Number(p.nota);
+          periodoAtual[p.cpf] = p.periodo;
         }
       });
 
-      // Calcula pontuação ponderada por motorista
-      const lista = Object.values(pontos).map(m => {
-        const quizzesFeitos = Object.keys(m.melhores).length;
-        const mediaAcertos = quizzesFeitos > 0
-          ? Object.values(m.melhores).reduce((s, v) => s + Number(v), 0) / quizzesFeitos
-          : 0;
-        const completude = totalQuizzes > 0 ? (quizzesFeitos / totalQuizzes) * 100 : 0;
-        const pontuacao = Math.round((mediaAcertos * 0.6) + (completude * 0.4));
-        return { ...m, quizzesFeitos, mediaAcertos: Math.round(mediaAcertos), completude: Math.round(completude), pontuacao };
+      // Agrupa tentativas — melhor tentativa por quiz
+      const melhores = {};
+      mots.forEach(m => { melhores[m.cpf] = {}; });
+      tents.forEach(t => {
+        if (!melhores[t.motorista_cpf]) return;
+        const atual = melhores[t.motorista_cpf][t.quiz_id];
+        if (!atual || t.percentual > atual) melhores[t.motorista_cpf][t.quiz_id] = t.percentual;
       });
 
-      // Ordena: pontuação desc, desempate por média
-      lista.sort((a, b) => b.pontuacao - a.pontuacao || b.mediaAcertos - a.mediaAcertos);
+      // Calcula nota final combinada
+      const lista = mots.map(m => {
+        const quizzesFeitos = Object.keys(melhores[m.cpf] || {}).length;
+        const mediaQuiz = quizzesFeitos > 0
+          ? Object.values(melhores[m.cpf]).reduce((s, v) => s + Number(v), 0) / quizzesFeitos
+          : 0;
+        const notaP = notaPerf[m.cpf] ?? null;
+        const periodo = periodoAtual[m.cpf] ?? null;
+
+        // Fórmula: nota_performance + (media_quiz/100 * 1.5), teto 10
+        let notaFinal = null;
+        let quizContrib = 0;
+        if (notaP !== null) {
+          quizContrib = Math.round(mediaQuiz) / 100 * 1.5;
+          notaFinal = Math.min(notaP + quizContrib, 10);
+          notaFinal = Math.round(notaFinal * 10) / 10;
+        }
+
+        // Motorista com nota ≥ 8.5 não precisa de quiz
+        const isento = notaP !== null && notaP >= 8.5;
+
+        return {
+          nome: m.nome, cpf: m.cpf, foto: m.foto || null,
+          notaPerf: notaP, periodo, quizzesFeitos,
+          mediaQuiz: Math.round(mediaQuiz), quizContrib: Math.round(quizContrib * 10) / 10,
+          notaFinal, isento,
+        };
+      });
+
+      // Ordena: quem tem nota final primeiro (desc), depois sem nota
+      lista.sort((a, b) => {
+        if (a.notaFinal !== null && b.notaFinal !== null) return b.notaFinal - a.notaFinal;
+        if (a.notaFinal !== null) return -1;
+        if (b.notaFinal !== null) return 1;
+        return b.quizzesFeitos - a.quizzesFeitos;
+      });
+
       setRanking(lista);
-    } catch {}
+    } catch (e) { console.error("ranking erro:", e); }
     setLoading(false);
   };
 
@@ -3657,23 +3692,48 @@ function RankingMotorista({ usuario, fotoUrl, setFotoUrl }) {
         {/* Info */}
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Meu Desempenho</div>
-          <div style={{ fontSize:16, fontWeight:900, color:C.WHITE, marginBottom:6 }}>{usuario.nome}</div>
-          {meuIndex >= 0 ? (
-            <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
-              {[
-                { label:"Posição", val: meuIndex === 0 ? "🥇 1º" : meuIndex === 1 ? "🥈 2º" : meuIndex === 2 ? "🥉 3º" : `${meuIndex + 1}º`, cor: meuIndex < 3 ? medalha(meuIndex).cor : C.MUTED },
-                { label:"Pontuação", val:`${ranking[meuIndex].pontuacao}pts`, cor:C.WHITE },
-                { label:"Média", val:`${ranking[meuIndex].mediaAcertos}%`, cor:ranking[meuIndex].mediaAcertos>=80?C.GREEN:ranking[meuIndex].mediaAcertos>=60?C.YELLOW:C.RED },
-                { label:"Quizzes", val:`${ranking[meuIndex].quizzesFeitos} respondidos`, cor:C.MUTED },
-              ].map(x => (
-                <div key={x.label}>
-                  <div style={{ fontSize:18, fontWeight:900, color:x.cor }}>{x.val}</div>
-                  <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>{x.label}</div>
+          <div style={{ fontSize:16, fontWeight:900, color:C.WHITE, marginBottom:10 }}>{usuario.nome}</div>
+          {meuIndex >= 0 ? (() => {
+            const me = ranking[meuIndex];
+            return (
+              <div>
+                <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginBottom:10 }}>
+                  <div>
+                    <div style={{ fontSize:22, fontWeight:900, color:meuIndex<3?medalha(meuIndex).cor:C.MUTED }}>
+                      {meuIndex===0?"🥇 1º":meuIndex===1?"🥈 2º":meuIndex===2?"🥉 3º":`${meuIndex+1}º`}
+                    </div>
+                    <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>Posição</div>
+                  </div>
+                  {me.notaFinal !== null && (
+                    <div>
+                      <div style={{ fontSize:22, fontWeight:900, color:me.notaFinal>=8.5?C.GREEN:me.notaFinal>=7?C.YELLOW:C.RED }}>
+                        {me.notaFinal.toFixed(1)}
+                      </div>
+                      <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>Nota Final</div>
+                    </div>
+                  )}
+                  {me.notaPerf !== null && (
+                    <div>
+                      <div style={{ fontSize:22, fontWeight:900, color:C.WHITE }}>{me.notaPerf.toFixed(1)}</div>
+                      <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>Performance {me.periodo||""}</div>
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontSize:22, fontWeight:900, color:me.mediaQuiz>=80?C.GREEN:me.mediaQuiz>=60?C.YELLOW:me.mediaQuiz>0?C.RED:C.MUTED2 }}>
+                      {me.mediaQuiz}%
+                    </div>
+                    <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>Quiz (+{me.quizContrib||0} pts)</div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ fontSize:13, color:C.MUTED }}>Você ainda não respondeu nenhum quiz.</div>
+                {me.isento && (
+                  <div style={{ fontSize:11, color:C.GREEN, background:"rgba(46,204,113,0.08)", border:"1px solid rgba(46,204,113,0.3)", borderRadius:2, padding:"4px 10px", display:"inline-block" }}>
+                    ✓ Performance ≥ 8.5 — quiz opcional
+                  </div>
+                )}
+              </div>
+            );
+          })() : (
+            <div style={{ fontSize:13, color:C.MUTED }}>Aguardando lançamento da nota de performance pelo gestor.</div>
           )}
         </div>
       </div>
@@ -3708,23 +3768,175 @@ function RankingMotorista({ usuario, fotoUrl, setFotoUrl }) {
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:14, fontWeight:700, color:isMe?C.WHITE:C.TEXT, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {m.nome} {isMe && <span style={{ fontSize:10, color:C.RED, fontWeight:900 }}>← você</span>}
+                    {m.isento && <span style={{ fontSize:9, color:C.GREEN, marginLeft:6, fontWeight:700 }}>✓ ISENTO</span>}
                   </div>
                   <div style={{ fontSize:11, color:C.MUTED }}>
-                    {m.quizzesFeitos > 0
-                      ? `${m.quizzesFeitos} quiz${m.quizzesFeitos>1?"zes":""} · média ${m.mediaAcertos}% · ${m.completude}% completo`
-                      : "Nenhum quiz respondido ainda"
+                    {m.notaPerf !== null
+                      ? `Perf: ${m.notaPerf.toFixed(1)} · Quiz: ${m.mediaQuiz}% (+${m.quizContrib}pts) · ${m.quizzesFeitos} quiz${m.quizzesFeitos!==1?"zes":""}`
+                      : "Aguardando nota de performance"
                     }
                   </div>
                 </div>
 
-                {/* Pontuação */}
+                {/* Nota Final */}
                 <div style={{ textAlign:"right", flexShrink:0 }}>
-                  <div style={{ fontSize:20, fontWeight:900, color:m.pontuacao>=80?C.GREEN:m.pontuacao>=60?C.YELLOW:m.pontuacao>0?C.RED:C.MUTED2 }}>{m.pontuacao}</div>
-                  <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>pts</div>
+                  <div style={{ fontSize:20, fontWeight:900, color:m.notaFinal===null?C.MUTED2:m.notaFinal>=8.5?C.GREEN:m.notaFinal>=7?C.YELLOW:C.RED }}>
+                    {m.notaFinal !== null ? m.notaFinal.toFixed(1) : "—"}
+                  </div>
+                  <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>nota</div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// PAINEL ADM — RANKING DE PERFORMANCE
+// ══════════════════════════════════════════════════
+function PainelPerformanceAdm({ showMsg }) {
+  const [motoristas, setMotoristas] = useState([]);
+  const [notas, setNotas] = useState({}); // cpf -> nota digitada
+  const [periodo, setPeriodo] = useState(() => {
+    const d = new Date();
+    return `${d.toLocaleString("pt-BR",{month:"short"}).replace(".","").replace(/^\w/,c=>c.toUpperCase())}/${d.getFullYear()}`;
+  });
+  const [historico, setHistorico] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => { carregar(); }, []);
+
+  const carregar = async () => {
+    setLoading(true);
+    try {
+      const [mots, hist] = await Promise.all([
+        sb.get("motoristas", "ativo=eq.true&order=nome.asc"),
+        sb.get("ranking_performance", "order=created_at.desc&limit=200"),
+      ]);
+      setMotoristas(Array.isArray(mots) ? mots : []);
+
+      // Pega a nota mais recente de cada motorista
+      const ultimas = {};
+      (Array.isArray(hist) ? hist : []).forEach(h => {
+        if (!ultimas[h.cpf]) ultimas[h.cpf] = h;
+      });
+      const notasAtuais = {};
+      Object.values(ultimas).forEach(h => { notasAtuais[h.cpf] = h.nota; });
+      setNotas(notasAtuais);
+      setHistorico(Array.isArray(hist) ? hist : []);
+    } catch {}
+    setLoading(false);
+  };
+
+  const salvarNotas = async () => {
+    if (!periodo.trim()) { showMsg("Informe o período.", C.RED); return; }
+    const entradas = Object.entries(notas).filter(([, v]) => v !== "" && v !== null && v !== undefined);
+    if (entradas.length === 0) { showMsg("Preencha ao menos uma nota.", C.RED); return; }
+
+    setSalvando(true);
+    try {
+      for (const [cpf, nota] of entradas) {
+        const mot = motoristas.find(m => m.cpf === cpf);
+        if (!mot) continue;
+        const num = parseFloat(String(nota).replace(",", "."));
+        if (isNaN(num) || num < 0 || num > 10) continue;
+        await sb.post("ranking_performance", { cpf, nome: mot.nome, nota: num.toFixed(2), periodo });
+      }
+      showMsg(`${entradas.length} notas salvas para ${periodo}!`);
+      carregar();
+    } catch { showMsg("Erro ao salvar.", C.RED); }
+    setSalvando(false);
+  };
+
+  const setNota = (cpf, val) => {
+    const limpo = val.replace(",", ".");
+    if (limpo !== "" && (isNaN(parseFloat(limpo)) || parseFloat(limpo) > 10 || parseFloat(limpo) < 0)) return;
+    setNotas(p => ({ ...p, [cpf]: limpo }));
+  };
+
+  const corNota = (nota) => {
+    const n = parseFloat(nota);
+    if (isNaN(n)) return C.MUTED;
+    if (n >= 8.5) return C.GREEN;
+    if (n >= 7) return C.YELLOW;
+    return C.RED;
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, padding:20, marginBottom:20 }}>
+        <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:14 }}>
+          Lançar Notas de Performance
+        </div>
+        <div style={{ fontSize:12, color:C.YELLOW, marginBottom:14, lineHeight:1.6 }}>
+          ⚡ Notas ≥ 8.5 isentam o motorista dos quizzes. A nota final do motorista é:
+          <strong style={{ color:C.WHITE }}> Perf. + (Média Quiz ÷ 100 × 1.5)</strong>
+        </div>
+
+        {/* Período */}
+        <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:20 }}>
+          <div style={{ fontSize:9, color:C.MUTED, letterSpacing:2, textTransform:"uppercase", fontWeight:700, flexShrink:0 }}>Período:</div>
+          <input value={periodo} onChange={e => setPeriodo(e.target.value)} placeholder="Ex: Jun/2026"
+            style={{ width:120, background:C.NAV, border:`1px solid ${C.BORDER2}`, borderRadius:2, padding:"8px 12px", color:C.WHITE, fontSize:14, outline:"none", fontFamily:"inherit", fontWeight:700 }} />
+        </div>
+
+        {/* Tabela de motoristas */}
+        {loading ? <div style={{ color:C.MUTED }}>Carregando...</div> : (
+          <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
+            {motoristas.map(m => {
+              const nota = notas[m.cpf] ?? "";
+              const n = parseFloat(nota);
+              const isento = !isNaN(n) && n >= 8.5;
+              return (
+                <div key={m.cpf} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:C.NAV, borderRadius:2, border:`1px solid ${isento?"rgba(46,204,113,0.3)":C.BORDER}` }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{m.nome}</div>
+                    <div style={{ fontSize:10, color:C.MUTED }}>{formatCPF(m.cpf)}</div>
+                  </div>
+                  {isento && <span style={{ fontSize:9, color:C.GREEN, fontWeight:800, letterSpacing:1 }}>✓ ISENTO</span>}
+                  <input
+                    value={nota}
+                    onChange={e => setNota(m.cpf, e.target.value)}
+                    placeholder="0.0 – 10.0"
+                    style={{
+                      width:80, background:C.CARD, border:`1px solid ${nota!==""?corNota(nota):C.BORDER2}`,
+                      borderRadius:2, padding:"8px 10px", color:nota!==""?corNota(nota):C.WHITE,
+                      fontSize:16, fontWeight:900, outline:"none", fontFamily:"inherit", textAlign:"center"
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <button onClick={salvarNotas} disabled={salvando} style={{ background:salvando?C.CARD2:C.RED, border:"none", borderRadius:2, padding:"12px 24px", color:C.WHITE, fontWeight:900, cursor:salvando?"not-allowed":"pointer", fontSize:10, letterSpacing:2, textTransform:"uppercase", fontFamily:"inherit" }}>
+          {salvando ? "Salvando..." : `💾 Salvar Notas — ${periodo}`}
+        </button>
+      </div>
+
+      {/* Histórico */}
+      {historico.length > 0 && (
+        <div>
+          <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>
+            Últimos lançamentos
+          </div>
+          <div style={{ background:C.CARD, border:`1px solid ${C.BORDER}`, borderRadius:2, overflow:"hidden" }}>
+            {[...new Map(historico.map(h => [`${h.cpf}-${h.periodo}`, h])).values()].slice(0, 20).map((h, i, arr) => (
+              <div key={h.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px", borderBottom:i<arr.length-1?`1px solid ${C.BORDER}`:"none" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.WHITE }}>{h.nome}</div>
+                  <div style={{ fontSize:11, color:C.MUTED }}>{h.periodo} · {new Date(h.created_at).toLocaleDateString("pt-BR")}</div>
+                </div>
+                <div style={{ fontSize:18, fontWeight:900, color:corNota(h.nota) }}>{Number(h.nota).toFixed(1)}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
