@@ -1093,6 +1093,8 @@ export default function App() {
   const [perfil, setPerfil] = useState(null);
   const [isAdm, setIsAdm] = useState(false);
   const [tab, setTab] = useState("ranking");
+  const [msgs, setMsgs] = useState([]);
+  const [loadingHist, setLoadingHist] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [regrasAdm, setRegrasAdm] = useState([]);
