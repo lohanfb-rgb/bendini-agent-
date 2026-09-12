@@ -1103,6 +1103,7 @@ export default function App() {
   const [quizRevisando, setQuizRevisando] = useState(null);
   const [quizzesCount, setQuizzesCount] = useState(0);
   const [obSlides, setObSlides] = useState([]);
+  const [fotoUrl, setFotoUrl] = useState(null);
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
@@ -1122,6 +1123,9 @@ export default function App() {
       ]);
       setRegrasAdm(Array.isArray(regs) ? regs : []);
       setObSlides(Array.isArray(ob) ? ob : []);
+      // Foto do motorista
+      const motData = Array.isArray(await sb.get("motoristas", `cpf=eq.${user.cpf}`)) ? (await sb.get("motoristas", `cpf=eq.${user.cpf}`))[0] : null;
+      if (motData?.foto) setFotoUrl(motData.foto);
       const quizzesAtivos = Array.isArray(qz) ? qz : [];
       const respondidos = new Set((Array.isArray(tent) ? tent : []).map(t => t.quiz_id));
       const pendentes = quizzesAtivos.filter(q => !respondidos.has(q.id)).length;
@@ -1221,6 +1225,7 @@ export default function App() {
     { id:"chat", label:"Assistente IA" },
     { id:"onboarding", label:"Onboarding" },
     { id:"quiz", label:"Quiz", badge: quizzesCount > 0 ? quizzesCount : null },
+    { id:"ranking", label:"🏆 Ranking" },
   ];
 
   if (isAdm) return <PainelAdm onSair={() => setIsAdm(false)} />;
@@ -1363,6 +1368,9 @@ export default function App() {
         {tab === "quiz" && !quizAtivo && !quizRevisando && <ListaQuizzes usuario={usuario} onIniciar={setQuizAtivo} onRevisar={setQuizRevisando} />}
         {tab === "quiz" && quizAtivo && <QuizDinamico quiz={quizAtivo} usuario={usuario} onFim={() => setQuizAtivo(null)} onVoltar={() => setQuizAtivo(null)} />}
         {tab === "quiz" && quizRevisando && <RevisaoQuiz quiz={quizRevisando} usuario={usuario} onVoltar={() => setQuizRevisando(null)} />}
+
+        {/* RANKING */}
+        {tab === "ranking" && <RankingMotorista usuario={usuario} fotoUrl={fotoUrl} setFotoUrl={setFotoUrl} />}
       </div>
 
       <style>{`
@@ -1444,6 +1452,7 @@ function ModuloOficina({ usuario, onSair }) {
   const [onboardingDone, setOnboardingDone] = useState(true);
   const [obStep, setObStep] = useState(0);
   const [obSlides, setObSlides] = useState([]);
+  const [fotoUrl, setFotoUrl] = useState(null);
   const endRef = useRef(null);
   const OC = "#e67e22";
 
@@ -2407,6 +2416,7 @@ function ModuloProg({ usuario, onSair }) {
   const [onboardingDone, setOnboardingDone] = useState(true); // assume true até checar no banco
   const [obStep, setObStep] = useState(0);
   const [obSlides, setObSlides] = useState([]);
+  const [fotoUrl, setFotoUrl] = useState(null);
   const endRef = useRef(null);
   const PC = "#1a7a4a"; // verde para programadores
 
@@ -3525,6 +3535,198 @@ function PainelOnboardingAdm({ showMsg }) {
           </div>
         )
       }
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════
+// RANKING DE MOTORISTAS
+// ══════════════════════════════════════════════════
+function RankingMotorista({ usuario, fotoUrl, setFotoUrl }) {
+  const [ranking, setRanking] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploadando, setUploadando] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => { carregarRanking(); }, []);
+
+  const carregarRanking = async () => {
+    setLoading(true);
+    try {
+      const [motoristas, tentativas, quizzes] = await Promise.all([
+        sb.get("motoristas", "ativo=eq.true&order=nome.asc"),
+        sb.get("quiz_tentativas", "order=created_at.desc"),
+        sb.get("quizzes", "status=eq.ativo"),
+      ]);
+
+      const mots = Array.isArray(motoristas) ? motoristas : [];
+      const tents = Array.isArray(tentativas) ? tentativas : [];
+      const totalQuizzes = Array.isArray(quizzes) ? quizzes.length : 1;
+
+      // Agrupa tentativas por motorista — usa só a melhor tentativa de cada quiz
+      const pontos = {};
+      mots.forEach(m => {
+        pontos[m.cpf] = { nome: m.nome, cpf: m.cpf, foto: m.foto || null, melhores: {} };
+      });
+
+      tents.forEach(t => {
+        if (!pontos[t.motorista_cpf]) return;
+        const atual = pontos[t.motorista_cpf].melhores[t.quiz_id];
+        if (!atual || t.percentual > atual) {
+          pontos[t.motorista_cpf].melhores[t.quiz_id] = t.percentual;
+        }
+      });
+
+      // Calcula pontuação ponderada por motorista
+      const lista = Object.values(pontos).map(m => {
+        const quizzesFeitos = Object.keys(m.melhores).length;
+        const mediaAcertos = quizzesFeitos > 0
+          ? Object.values(m.melhores).reduce((s, v) => s + Number(v), 0) / quizzesFeitos
+          : 0;
+        const completude = totalQuizzes > 0 ? (quizzesFeitos / totalQuizzes) * 100 : 0;
+        const pontuacao = Math.round((mediaAcertos * 0.6) + (completude * 0.4));
+        return { ...m, quizzesFeitos, mediaAcertos: Math.round(mediaAcertos), completude: Math.round(completude), pontuacao };
+      });
+
+      // Ordena: pontuação desc, desempate por média
+      lista.sort((a, b) => b.pontuacao - a.pontuacao || b.mediaAcertos - a.mediaAcertos);
+      setRanking(lista);
+    } catch {}
+    setLoading(false);
+  };
+
+  const handleFoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadando(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        // Comprime a imagem para base64 menor
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement("canvas");
+          const size = 200;
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          // Crop quadrado centralizado
+          const menor = Math.min(img.width, img.height);
+          const ox = (img.width - menor) / 2;
+          const oy = (img.height - menor) / 2;
+          ctx.drawImage(img, ox, oy, menor, menor, 0, 0, size, size);
+          const base64 = canvas.toDataURL("image/jpeg", 0.75);
+          await sb.patch("motoristas", `cpf=eq.${usuario.cpf}`, { foto: base64 });
+          setFotoUrl(base64);
+          setUploadando(false);
+          carregarRanking();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    } catch { setUploadando(false); }
+  };
+
+  const medalha = (pos) => {
+    if (pos === 0) return { emoji:"🥇", cor:"#F5B301" };
+    if (pos === 1) return { emoji:"🥈", cor:"#A8A9AD" };
+    if (pos === 2) return { emoji:"🥉", cor:"#CD7F32" };
+    return { emoji: `${pos + 1}º`, cor: C.MUTED };
+  };
+
+  const meuIndex = ranking.findIndex(r => r.cpf === usuario.cpf);
+
+  return (
+    <div style={{ flex:1, overflowY:"auto", padding:20 }}>
+
+      {/* MEU CARD */}
+      <div style={{ background:C.CARD, border:`2px solid ${C.RED}`, borderRadius:2, padding:20, marginBottom:24, display:"flex", alignItems:"center", gap:16 }}>
+        {/* Foto */}
+        <div style={{ position:"relative", flexShrink:0 }} onClick={() => fileRef.current?.click()}>
+          <div style={{ width:72, height:72, borderRadius:"50%", background:C.BORDER2, overflow:"hidden", border:`2px solid ${C.RED}`, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {fotoUrl
+              ? <img src={fotoUrl} style={{ width:"100%", height:"100%", objectFit:"cover" }} alt="foto" />
+              : <span style={{ fontSize:28 }}>👤</span>
+            }
+          </div>
+          <div style={{ position:"absolute", bottom:0, right:0, width:22, height:22, borderRadius:"50%", background:C.RED, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, cursor:"pointer" }}>
+            {uploadando ? "⏳" : "📷"}
+          </div>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleFoto} style={{ display:"none" }} />
+
+        {/* Info */}
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:10, color:C.RED, letterSpacing:2, fontWeight:900, textTransform:"uppercase", marginBottom:4 }}>Meu Desempenho</div>
+          <div style={{ fontSize:16, fontWeight:900, color:C.WHITE, marginBottom:6 }}>{usuario.nome}</div>
+          {meuIndex >= 0 ? (
+            <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
+              {[
+                { label:"Posição", val: meuIndex === 0 ? "🥇 1º" : meuIndex === 1 ? "🥈 2º" : meuIndex === 2 ? "🥉 3º" : `${meuIndex + 1}º`, cor: meuIndex < 3 ? medalha(meuIndex).cor : C.MUTED },
+                { label:"Pontuação", val:`${ranking[meuIndex].pontuacao}pts`, cor:C.WHITE },
+                { label:"Média", val:`${ranking[meuIndex].mediaAcertos}%`, cor:ranking[meuIndex].mediaAcertos>=80?C.GREEN:ranking[meuIndex].mediaAcertos>=60?C.YELLOW:C.RED },
+                { label:"Quizzes", val:`${ranking[meuIndex].quizzesFeitos} respondidos`, cor:C.MUTED },
+              ].map(x => (
+                <div key={x.label}>
+                  <div style={{ fontSize:18, fontWeight:900, color:x.cor }}>{x.val}</div>
+                  <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>{x.label}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize:13, color:C.MUTED }}>Você ainda não respondeu nenhum quiz.</div>
+          )}
+        </div>
+      </div>
+      <div style={{ fontSize:9, color:C.MUTED, textAlign:"center", marginTop:-16, marginBottom:16 }}>Toque na foto para atualizar</div>
+
+      {/* RANKING */}
+      <div style={{ fontSize:10, color:C.MUTED, letterSpacing:2, fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>
+        Classificação Geral — {ranking.length} motoristas
+      </div>
+
+      {loading ? (
+        <div style={{ padding:20, color:C.MUTED, fontSize:13, textAlign:"center" }}>Carregando...</div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {ranking.map((m, i) => {
+            const { emoji, cor } = medalha(i);
+            const isMe = m.cpf === usuario.cpf;
+            return (
+              <div key={m.cpf} style={{ background:isMe?`rgba(192,57,43,0.1)`:C.CARD, border:`1px solid ${isMe?C.RED:C.BORDER}`, borderRadius:2, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                {/* Posição */}
+                <div style={{ fontSize:i<3?22:14, fontWeight:900, color:cor, minWidth:32, textAlign:"center", flexShrink:0 }}>{emoji}</div>
+
+                {/* Foto */}
+                <div style={{ width:44, height:44, borderRadius:"50%", background:C.BORDER2, overflow:"hidden", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", border:`1px solid ${isMe?C.RED:C.BORDER2}` }}>
+                  {m.foto
+                    ? <img src={m.foto} style={{ width:"100%", height:"100%", objectFit:"cover" }} alt="" />
+                    : <span style={{ fontSize:18 }}>👤</span>
+                  }
+                </div>
+
+                {/* Info */}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:isMe?C.WHITE:C.TEXT, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {m.nome} {isMe && <span style={{ fontSize:10, color:C.RED, fontWeight:900 }}>← você</span>}
+                  </div>
+                  <div style={{ fontSize:11, color:C.MUTED }}>
+                    {m.quizzesFeitos > 0
+                      ? `${m.quizzesFeitos} quiz${m.quizzesFeitos>1?"zes":""} · média ${m.mediaAcertos}% · ${m.completude}% completo`
+                      : "Nenhum quiz respondido ainda"
+                    }
+                  </div>
+                </div>
+
+                {/* Pontuação */}
+                <div style={{ textAlign:"right", flexShrink:0 }}>
+                  <div style={{ fontSize:20, fontWeight:900, color:m.pontuacao>=80?C.GREEN:m.pontuacao>=60?C.YELLOW:m.pontuacao>0?C.RED:C.MUTED2 }}>{m.pontuacao}</div>
+                  <div style={{ fontSize:9, color:C.MUTED, letterSpacing:1, textTransform:"uppercase" }}>pts</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
