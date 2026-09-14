@@ -34,9 +34,30 @@ module.exports = async function handler(req, res) {
     await fetch(`${SB}/rest/v1/${table}?${query}`, { method: "DELETE", headers: H });
   };
 
+  // ---- Sólides (RH) ----
+  const SOLIDEZ_BASE = (SOLIDEZ_URL || "https://app.solides.com/pt-BR/api/v1").replace(/\/$/, "");
+  const solidezRequest = async (method, path, body) => {
+    const r = await fetch(`${SOLIDEZ_BASE}${path}`, {
+      method,
+      headers: {
+        "Authorization": `Token token=${SOLIDEZ_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await r.text();
+    let data;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    return { status: r.status, data };
+  };
+  // Somente leitura, caminhos limitados a recursos de RH — usado para descobrir
+  // o formato real da API (IDs de cargo/departamento, filtro por CPF) antes de
+  // travar a lógica final.
+  const SOLIDEZ_CAMINHOS_PERMITIDOS = /^\/(colaboradores|positions?|departments?|departamentos|cargos?|sectors?|setores)(\/[\w-]+)?$/;
+
   // GET
   if (req.method === "GET") {
-    const { action, table, query } = req.query;
+    const { action, table, query, caminho } = req.query;
     if (action === "sb_get") {
       try {
         const d = await sbGet(table, query || "");
@@ -54,6 +75,18 @@ module.exports = async function handler(req, res) {
         chave_mascarada: mascarada,
         url_configurada: Boolean(SOLIDEZ_URL),
       });
+    }
+
+    // EXPLORAÇÃO (somente leitura) — ex: ?action=solidez_get&caminho=/positions&query=page=1
+    if (action === "solidez_get") {
+      if (!caminho || !SOLIDEZ_CAMINHOS_PERMITIDOS.test(caminho)) {
+        return res.status(400).json({ error: "Caminho não permitido para exploração." });
+      }
+      try {
+        const qs = query ? `?${decodeURIComponent(query)}` : "";
+        const { status, data } = await solidezRequest("GET", `${caminho}${qs}`);
+        return res.status(status).json(data);
+      } catch (e) { return res.status(500).json({ error: e.message }); }
     }
 
     return res.status(400).json({ error: "Unknown action" });
@@ -76,6 +109,54 @@ module.exports = async function handler(req, res) {
     if (action === "sb_delete") {
       try { await sbDelete(req.body.table, req.body.query); return res.status(200).json({ ok: true }); }
       catch (e) { return res.status(500).json({ error: e.message }); }
+    }
+
+    // SÓLIDES — cria colaborador (motorista). Campos vindos do painel, nunca passthrough livre.
+    if (action === "solidez_criar_colaborador") {
+      const { name, email, cpf, departamentId, positionId, dateAdmission, typeContract, nqc } = req.body;
+      if (!name || !email || !cpf) {
+        return res.status(400).json({ error: "name, email e cpf são obrigatórios." });
+      }
+      const payload = { name, email, cpf };
+      if (departamentId != null) payload.departamentId = departamentId;
+      if (positionId != null) payload.positionId = positionId;
+      if (dateAdmission) payload.dateAdmission = dateAdmission;
+      if (typeContract) payload.typeContract = typeContract;
+      if (nqc) payload.nqc = nqc;
+      try {
+        const { status, data } = await solidezRequest("POST", "/colaboradores", payload);
+        return res.status(status).json(data);
+      } catch (e) { return res.status(500).json({ error: e.message }); }
+    }
+
+    // SÓLIDES — atualiza colaborador existente
+    if (action === "solidez_atualizar_colaborador") {
+      const { id, ...campos } = req.body;
+      if (!id) return res.status(400).json({ error: "id é obrigatório." });
+      try {
+        const { status, data } = await solidezRequest("PUT", `/colaboradores/${id}`, campos);
+        return res.status(status).json(data);
+      } catch (e) { return res.status(500).json({ error: e.message }); }
+    }
+
+    // SÓLIDES — teste com pessoa fictícia, pra validar campos antes de rodar em produção
+    if (action === "solidez_teste_fake") {
+      const { departamentId, positionId, typeContract } = req.body;
+      const marcador = Date.now();
+      const payload = {
+        name: "TESTE BENDINI APAGAR DEPOIS",
+        email: `teste.bendini.apagar+${marcador}@example.com`,
+        cpf: "11144477735", // CPF de teste com dígito verificador válido, sem titular real
+        nqc: "00000000000",
+        dateAdmission: new Date().toISOString().slice(0, 10),
+      };
+      if (departamentId != null) payload.departamentId = departamentId;
+      if (positionId != null) payload.positionId = positionId;
+      if (typeContract) payload.typeContract = typeContract;
+      try {
+        const { status, data } = await solidezRequest("POST", "/colaboradores", payload);
+        return res.status(status).json({ payload_enviado: payload, resposta_status: status, resposta: data });
+      } catch (e) { return res.status(500).json({ error: e.message }); }
     }
 
     // GERAR QUIZ (motoristas)
