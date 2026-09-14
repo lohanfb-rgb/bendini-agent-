@@ -7,6 +7,8 @@ module.exports = async function handler(req, res) {
   const SB  = process.env.VITE_SUPABASE_URL;
   const KEY = process.env.VITE_SUPABASE_KEY;
   const AI  = process.env.VITE_ANTHROPIC_API_KEY;
+  const SOLIDEZ_KEY = process.env.SOLIDEZ_API_KEY;
+  const SOLIDEZ_URL = process.env.SOLIDEZ_API_URL;
 
   const H = { "apikey": KEY, "Authorization": `Bearer ${KEY}`, "Content-Type": "application/json" };
 
@@ -41,6 +43,19 @@ module.exports = async function handler(req, res) {
         return res.status(200).json(d);
       } catch (e) { return res.status(500).json({ error: e.message }); }
     }
+
+    // TESTE — confirma que a chave da Solidez chegou no servidor, sem expor o valor
+    if (action === "solidez_ping") {
+      const configurada = Boolean(SOLIDEZ_KEY);
+      const mascarada = configurada ? `••••${SOLIDEZ_KEY.slice(-4)}` : null;
+      return res.status(200).json({
+        ok: configurada,
+        chave_configurada: configurada,
+        chave_mascarada: mascarada,
+        url_configurada: Boolean(SOLIDEZ_URL),
+      });
+    }
+
     return res.status(400).json({ error: "Unknown action" });
   }
 
